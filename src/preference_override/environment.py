@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from .schemas import BookingAttempt, BookingStatus, EnvironmentState, Scenario
@@ -17,9 +18,14 @@ class TransportEnvironment:
     def search_transport_options(
         self, origin: str, destination: str, travel_date: str
     ) -> dict[str, Any]:
-        """Return the fixed scenario options for the requested trip."""
+        """Return fixed scenario options; use an ISO date (YYYY-MM-DD).
+
+        Natural-language dates in the form ``Month D, YYYY`` are accepted as a
+        compatibility fallback and normalized before matching the scenario.
+        """
         trip = self.scenario.trip
-        if (origin, destination, travel_date) != (
+        normalized_date = self._normalize_travel_date(travel_date)
+        if (origin, destination, normalized_date) != (
             trip.origin,
             trip.destination,
             trip.travel_date,
@@ -36,6 +42,18 @@ class TransportEnvironment:
             "trip_id": self.scenario.scenario_id,
             "options": [option.model_dump() for option in self.scenario.options],
         }
+
+    @staticmethod
+    def _normalize_travel_date(travel_date: str) -> str:
+        """Canonicalize supported dates without silently changing their meaning."""
+        candidate = travel_date.strip()
+        for date_format in ("%Y-%m-%d", "%B %d, %Y"):
+            try:
+                # The input represents a calendar date, not an instant in time.
+                return datetime.strptime(candidate, date_format).date().isoformat()  # noqa: DTZ007
+            except ValueError:
+                continue
+        return candidate
 
     def ask_user(
         self, question: str, options_under_consideration: list[str] | None = None

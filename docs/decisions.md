@@ -9,3 +9,5 @@
 - An agent may ask the user questions. Booking the bus requires explicit approval supplied through the simulated user interaction; booking the train is authorized by the initial request.
 - LangChain is used for the model/tool-calling boundary. Scenario validation, state transitions, trace logging, and scoring remain project-local deterministic code.
 - The initial evaluated model path uses local Ollama inference with `qwen3:4b`, an open-weight model. It replaces the earlier OpenAI API runner and requires no API key or per-call API charge.
+- The transport-search tool contract specifies ISO dates (`YYYY-MM-DD`). The deterministic environment also normalizes the limited natural-language form `Month D, YYYY` before scenario matching, preventing format-only retrieval failures in the pilot.
+- Any agent question requiring a simulated user reply must use `ask_user`; ordinary final-text questions end the automated trajectory and are therefore disallowed by the agent contract. The initial request remains sufficient authorization to book the preferred train after search.

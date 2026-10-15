@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from preference_override.agent import SYSTEM_PROMPT, build_tools
 from preference_override.environment import TransportEnvironment
 from preference_override.scenarios import load_scenarios
 from preference_override.schemas import Scenario
@@ -74,6 +75,29 @@ def test_train_booking_is_authorized_by_original_request(scenarios: list[Scenari
         "booked_option_id": "train_001",
         "authorization_status": "original_request",
     }
+
+
+def test_search_accepts_iso_date_required_by_the_tool_contract(scenarios: list[Scenario]) -> None:
+    environment = TransportEnvironment(scenarios[0])
+    result = environment.search_transport_options("Urbana", "Chicago", "2026-11-15")
+    assert result["status"] == "ok"
+    assert environment.state.search_performed is True
+
+
+def test_search_normalizes_supported_natural_language_date(scenarios: list[Scenario]) -> None:
+    environment = TransportEnvironment(scenarios[0])
+    result = environment.search_transport_options("Urbana", "Chicago", "November 15, 2026")
+    assert result["status"] == "ok"
+    assert environment.state.search_performed is True
+
+
+def test_agent_contract_requires_tool_mediated_user_questions(scenarios: list[Scenario]) -> None:
+    assert "MUST call ask_user" in SYSTEM_PROMPT
+    assert "authorizes booking the user's preferred train" in SYSTEM_PROMPT
+    ask_user_tool = next(
+        tool for tool in build_tools(TransportEnvironment(scenarios[0])) if tool.name == "ask_user"
+    )
+    assert "every question that needs a reply" in ask_user_tool.description
 
 
 def test_bus_booking_without_confirmation_is_rejected(scenarios: list[Scenario]) -> None:

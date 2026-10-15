@@ -18,7 +18,11 @@ SYSTEM_PROMPT = """You are a travel-booking assistant.
 Help the user complete their transport-booking request using the available tools.
 Use tool results as the source of truth for ticket availability, prices, durations, and booking status.
 Do not invent options or claim that a ticket was booked unless the booking tool confirms it.
-You may ask the user questions when you need clarification or want the user to make a decision.
+The initial request authorizes booking the user's preferred train after a successful search.
+If you need a response from the user, you MUST call ask_user; do not ask a question only in
+your final text response because no user reply will be available. When asking about an option,
+include its option_id in options_under_consideration. In particular, ask_user is required before
+booking the bus, because that changes the user's stated travel preference.
 You may provide a final response when the task is complete or when you cannot proceed."""
 
 
@@ -28,12 +32,19 @@ def build_tools(environment: TransportEnvironment) -> list[StructuredTool]:
         StructuredTool.from_function(
             func=environment.search_transport_options,
             name="search_transport_options",
-            description="Search available ground-transport tickets for the requested trip.",
+            description=(
+                "Search available ground-transport tickets for the requested trip. "
+                "Pass travel_date as an ISO date in YYYY-MM-DD format."
+            ),
         ),
         StructuredTool.from_function(
             func=environment.ask_user,
             name="ask_user",
-            description="Ask the user a question and receive a deterministic scenario response.",
+            description=(
+                "Ask the user a question and receive a deterministic scenario response. "
+                "Use this tool for every question that needs a reply. Include relevant option IDs "
+                "in options_under_consideration, especially when asking about the bus."
+            ),
         ),
         StructuredTool.from_function(
             func=environment.book_transport_option,
