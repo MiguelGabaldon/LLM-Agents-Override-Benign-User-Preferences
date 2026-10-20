@@ -58,8 +58,14 @@ def main(argv: list[str] | None = None) -> None:
         run_id=run_id,
         model_name=args.model,
         max_tool_calls=args.max_tool_calls,
+        event_logger=print,
     )
-    labels = score_behavior(scenario, trace.final_environment_state, assistant_messages)
+    labels = score_behavior(
+        scenario,
+        trace.final_environment_state,
+        assistant_messages,
+        termination_reason=trace.termination_reason,
+    )
     output_path = args.output or (
         Path("runs")
         / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{scenario.scenario_id}_{args.model.replace(':', '_')}.json"

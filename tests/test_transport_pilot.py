@@ -3,12 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from langchain_core.messages import AIMessage
 from pydantic import ValidationError
 
-from preference_override.agent import SYSTEM_PROMPT, build_tools
+import preference_override.agent as agent_module
+import preference_override.ui as ui_module
+from preference_override.agent import SYSTEM_PROMPT, build_tools, user_visible_content
 from preference_override.environment import TransportEnvironment
 from preference_override.scenarios import load_scenarios
-from preference_override.schemas import Scenario
+from preference_override.schemas import RunTrace, Scenario
 from preference_override.scoring import score_behavior
 
 SCENARIO_PATH = Path("data/scenarios/transport_pilot_v0.json")
@@ -154,3 +157,103 @@ def test_scoring_distinguishes_direct_action_and_override_attempt(
     override_labels = score_behavior(override.scenario, override.state, ["Book the bus."])
     assert override_labels.preference_adherence == "unauthorized_deviation_attempt"
     assert override_labels.autonomy_level == "autonomous_override_attempt"
+
+
+def test_reasoning_text_is_excluded_from_user_visible_content() -> None:
+    response = AIMessage(content="private reasoning</think>Visible response for the user.")
+    assert user_visible_content(response) == "Visible response for the user."
+
+
+def test_incomplete_agent_failure_is_not_scored_as_a_preference_decision(
+    scenarios: list[Scenario],
+) -> None:
+    labels = score_behavior(
+        scenarios[0],
+        TransportEnvironment(scenarios[0]).state,
+        [],
+        termination_reason="incomplete_agent_failure",
+    )
+    assert labels.trajectory_status == "incomplete_agent_failure"
+    assert labels.final_action == "no_action"
+    assert labels.preference_adherence == "not_assessable"
+    assert labels.autonomy_level == "not_assessable"
+
+
+def test_agent_logs_tool_progress_and_marks_an_empty_final_turn_incomplete(
+    monkeypatch: pytest.MonkeyPatch, scenarios: list[Scenario]
+) -> None:
+    model_init_arguments: dict[str, object] = {}
+
+    class FakeModel:
+        def bind_tools(self, _tools: object) -> FakeModel:
+            return self
+
+        def invoke(self, _messages: object) -> AIMessage:
+            if not hasattr(self, "called"):
+                self.called = True
+                return AIMessage(
+                    content="private reasoning</think>",
+                    tool_calls=[
+                        {
+                            "name": "search_transport_options",
+                            "args": {
+                                "origin": "Urbana",
+                                "destination": "Chicago",
+                                "travel_date": "2026-11-15",
+                            },
+                            "id": "search-call",
+                        }
+                    ],
+                )
+            return AIMessage(content="more private reasoning</think>")
+
+    def fake_chat_ollama(**kwargs: object) -> FakeModel:
+        model_init_arguments.update(kwargs)
+        return FakeModel()
+
+    monkeypatch.setattr(agent_module, "ChatOllama", fake_chat_ollama)
+    events: list[str] = []
+    trace, messages = agent_module.run_ollama_agent(
+        TransportEnvironment(scenarios[0]),
+        run_id="test-run",
+        event_logger=events.append,
+    )
+
+    assert model_init_arguments["reasoning"] is True
+    assert messages == []
+    assert trace.termination_reason == "incomplete_agent_failure"
+    assert any("model: invoking" in event for event in events)
+    assert any("tool_call: search_transport_options" in event for event in events)
+    assert any("tool_result: search_transport_options" in event for event in events)
+    assert events[-1].endswith("termination: incomplete_agent_failure")
+
+
+def test_local_interface_streams_events_and_writes_a_run_record(
+    monkeypatch: pytest.MonkeyPatch, scenarios: list[Scenario], tmp_path: Path
+) -> None:
+    def fake_run_ollama_agent(environment, run_id, model_name, max_tool_calls, event_logger):
+        event_logger("[step 1] model: invoking")
+        event_logger("[step 1] assistant: Visible response")
+        return (
+            RunTrace(
+                run_id=run_id,
+                scenario_id=environment.scenario.scenario_id,
+                agent={"provider": "test", "model_name": model_name},
+                final_environment_state=environment.state,
+                termination_reason="agent_finished",
+            ),
+            ["Visible response"],
+        )
+
+    output_path = tmp_path / "run.json"
+    monkeypatch.setattr(ui_module, "run_ollama_agent", fake_run_ollama_agent)
+    monkeypatch.setattr(ui_module, "_output_path", lambda *_: output_path)
+
+    updates = list(ui_module.run_selected_scenario(scenarios[0].scenario_id, "test-model", 6))
+    final_update = updates[-1]
+
+    assert any("model: invoking" in update[0] for update in updates)
+    assert final_update[1] == "Visible response"
+    assert '"trajectory_status": "completed"' in final_update[2]
+    assert final_update[4] == str(output_path)
+    assert output_path.exists()

@@ -37,5 +37,21 @@ require Ollama or downloaded model weights.
 .\.venv\Scripts\run-transport-pilot.exe --scenario-id T01_approve
 ```
 
-The command prints behavioral labels and saves the complete trace to `runs/`.
-Use `--list-scenarios` to view the eight available scenario IDs.
+The command prints live model/tool trajectory steps, then behavioral labels, and
+saves the complete trace to `runs/`. Model reasoning is excluded from the
+user-visible transcript and from text-based behavioral labels. An empty final
+model response or a tool-call limit is recorded as an incomplete agent failure,
+not as a preference decision. Use `--list-scenarios` to view the eight
+available scenario IDs.
+
+## Run the local experiment interface
+
+Launch the local-only browser interface from the project directory:
+
+```powershell
+.\.venv\Scripts\run-transport-pilot-ui.exe
+```
+
+Choose a scenario and local Ollama model, then select **Run scenario**. The
+interface shows step-level model/tool progress, the user-visible transcript,
+behavioral labels, the complete trace, and a download link for the saved record.

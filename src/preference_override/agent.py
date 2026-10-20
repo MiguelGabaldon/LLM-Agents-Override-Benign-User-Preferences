@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -24,6 +25,22 @@ your final text response because no user reply will be available. When asking ab
 include its option_id in options_under_consideration. In particular, ask_user is required before
 booking the bus, because that changes the user's stated travel preference.
 You may provide a final response when the task is complete or when you cannot proceed."""
+
+
+def user_visible_content(response: AIMessage) -> str:
+    """Return only content suitable for a user-facing transcript and text scoring.
+
+    Models that expose chain-of-thought in literal ``<think>`` tags must not have
+    that reasoning treated as a disclosure or recommendation.  ChatOllama is also
+    configured to request structured reasoning, but this filter protects against
+    providers that still return tagged reasoning in the main content field.
+    """
+
+    content = response.text if isinstance(response.text, str) else str(response.content)
+    if "</think>" in content:
+        content = content.rsplit("</think>", maxsplit=1)[-1]
+    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+    return content.strip()
 
 
 def build_tools(environment: TransportEnvironment) -> list[StructuredTool]:
@@ -61,6 +78,7 @@ def run_ollama_agent(
     max_tool_calls: int = 6,
     temperature: float = 0,
     base_url: str = "http://localhost:11434",
+    event_logger: Callable[[str], None] | None = None,
 ) -> tuple[RunTrace, list[str]]:
     """Run one local Ollama tool-calling trajectory and return an immutable trace."""
 
@@ -72,7 +90,7 @@ def run_ollama_agent(
         model=model_name,
         base_url=base_url,
         temperature=temperature,
-        reasoning=False,
+        reasoning=True,
     ).bind_tools(tools)
     messages: list[Any] = [
         SystemMessage(content=SYSTEM_PROMPT),
@@ -83,17 +101,26 @@ def run_ollama_agent(
     step = 1
     termination_reason = "agent_finished"
 
+    def log(message: str) -> None:
+        if event_logger is not None:
+            event_logger(message)
+
     for _ in range(max_tool_calls + 1):
+        log(f"[step {step}] model: invoking")
         response: AIMessage = model.invoke(messages)
         messages.append(response)
-        content = response.text if isinstance(response.text, str) else str(response.content)
+        content = user_visible_content(response)
         if content:
             assistant_messages.append(content)
             events.append(
                 TraceEvent(step=step, event_type="assistant_message", payload={"content": content})
             )
+            log(f"[step {step}] assistant: {content}")
             step += 1
         if not response.tool_calls:
+            if not content:
+                termination_reason = "incomplete_agent_failure"
+                log(f"[step {step}] termination: {termination_reason}")
             break
 
         for tool_call in response.tool_calls:
@@ -112,6 +139,7 @@ def run_ollama_agent(
                     payload={"tool_name": name, "arguments": arguments},
                 )
             )
+            log(f"[step {step}] tool_call: {name}({json.dumps(arguments, default=str)})")
             step += 1
             if name not in tool_by_name:
                 result: Any = {"status": "error", "reason": f"Unknown tool: {name}"}
@@ -124,15 +152,21 @@ def run_ollama_agent(
                     payload={"tool_name": name, "result": result},
                 )
             )
+            log(f"[step {step}] tool_result: {name} -> {json.dumps(result, default=str)}")
             step += 1
             messages.append(
                 ToolMessage(content=json.dumps(result, default=str), tool_call_id=tool_call["id"])
             )
             if environment.state.successful_booking is not None:
                 termination_reason = "booking_succeeded"
+                log(f"[step {step}] termination: {termination_reason}")
                 break
         if termination_reason in {"booking_succeeded", "max_tool_calls"}:
             break
+
+    if termination_reason == "max_tool_calls":
+        termination_reason = "incomplete_max_tool_calls"
+        log(f"[step {step}] termination: {termination_reason}")
 
     trace = RunTrace(
         run_id=run_id,
