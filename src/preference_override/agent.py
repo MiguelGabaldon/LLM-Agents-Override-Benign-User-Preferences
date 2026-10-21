@@ -9,9 +9,9 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
-from langchain_ollama import ChatOllama
 
 from .environment import TransportEnvironment
+from .models import ModelAPIError, api_error_message, create_model
 from .schemas import RunTrace, TraceEvent
 
 SYSTEM_PROMPT = """You are a travel-booking assistant.
@@ -71,7 +71,7 @@ def build_tools(environment: TransportEnvironment) -> list[StructuredTool]:
     ]
 
 
-def run_ollama_agent(
+def run_agent(
     environment: TransportEnvironment,
     run_id: str,
     model_name: str = "qwen3:4b",
@@ -80,18 +80,14 @@ def run_ollama_agent(
     base_url: str = "http://localhost:11434",
     event_logger: Callable[[str], None] | None = None,
 ) -> tuple[RunTrace, list[str]]:
-    """Run one local Ollama tool-calling trajectory and return an immutable trace."""
+    """Run the same tool-calling trajectory with a local or API model."""
 
     tools = build_tools(environment)
     tool_by_name: dict[str, Callable[..., Any]] = {
         tool.name: tool.func for tool in tools if tool.func is not None
     }
-    model = ChatOllama(
-        model=model_name,
-        base_url=base_url,
-        temperature=temperature,
-        reasoning=True,
-    ).bind_tools(tools)
+    adapter, model_metadata = create_model(model_name, temperature, base_url)
+    model = adapter.bind_tools(tools)
     messages: list[Any] = [
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=environment.scenario.user_request),
@@ -107,7 +103,12 @@ def run_ollama_agent(
 
     for _ in range(max_tool_calls + 1):
         log(f"[step {step}] model: invoking")
-        response: AIMessage = model.invoke(messages)
+        try:
+            response: AIMessage = model.invoke(messages)
+        except Exception as error:
+            if model_metadata["provider"] != "ollama":
+                raise ModelAPIError(api_error_message(error, model_metadata["provider"])) from None
+            raise
         messages.append(response)
         content = user_visible_content(response)
         if content:
@@ -171,14 +172,31 @@ def run_ollama_agent(
     trace = RunTrace(
         run_id=run_id,
         scenario_id=environment.scenario.scenario_id,
-        agent={
-            "provider": "ollama",
-            "model_name": model_name,
-            "temperature": temperature,
-            "base_url": base_url,
-        },
+        agent=model_metadata,
         events=events,
         final_environment_state=environment.state,
         termination_reason=termination_reason,
     )
     return trace, assistant_messages
+
+
+def run_ollama_agent(
+    environment: TransportEnvironment,
+    run_id: str,
+    model_name: str = "qwen3:4b",
+    max_tool_calls: int = 6,
+    temperature: float = 0,
+    base_url: str = "http://localhost:11434",
+    event_logger: Callable[[str], None] | None = None,
+) -> tuple[RunTrace, list[str]]:
+    """Backward-compatible local entry point with the original Ollama settings."""
+
+    return run_agent(
+        environment,
+        run_id,
+        f"ollama:{model_name}",
+        max_tool_calls,
+        temperature,
+        base_url,
+        event_logger,
+    )

@@ -7,6 +7,7 @@ from langchain_core.messages import AIMessage
 from pydantic import ValidationError
 
 import preference_override.agent as agent_module
+import preference_override.models as models_module
 import preference_override.ui as ui_module
 from preference_override.agent import SYSTEM_PROMPT, build_tools, user_visible_content
 from preference_override.environment import TransportEnvironment
@@ -211,7 +212,7 @@ def test_agent_logs_tool_progress_and_marks_an_empty_final_turn_incomplete(
         model_init_arguments.update(kwargs)
         return FakeModel()
 
-    monkeypatch.setattr(agent_module, "ChatOllama", fake_chat_ollama)
+    monkeypatch.setattr(models_module, "ChatOllama", fake_chat_ollama)
     events: list[str] = []
     trace, messages = agent_module.run_ollama_agent(
         TransportEnvironment(scenarios[0]),
@@ -246,7 +247,7 @@ def test_local_interface_streams_events_and_writes_a_run_record(
         )
 
     output_path = tmp_path / "run.json"
-    monkeypatch.setattr(ui_module, "run_ollama_agent", fake_run_ollama_agent)
+    monkeypatch.setattr(ui_module, "run_agent", fake_run_ollama_agent)
     monkeypatch.setattr(ui_module, "_output_path", lambda *_: output_path)
 
     updates = list(ui_module.run_selected_scenario(scenarios[0].scenario_id, "test-model", 6))
