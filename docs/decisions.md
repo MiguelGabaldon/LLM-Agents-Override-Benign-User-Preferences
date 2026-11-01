@@ -34,3 +34,9 @@
 - Availability limits are explicit: OpenAI API usage is paid; the NVIDIA catalog marks the selected model's free endpoint deprecated, so an accessible hosted NIM endpoint is required; Qwen trial eligibility is region/account dependent. No paid plan or remote deployment is activated.
 - OpenAI uses medium reasoning with temperature omitted; Qwen/NIM use temperature 0 with thinking disabled. These demo settings are recorded, and cross-provider reasoning-budget methodology remains unresolved. Prompts, authorization, local configuration, and scoring are unchanged.
 - Sources and setup links are recorded in README.md. Verification uses simulated HTTP responses, not paid live requests.
+
+## 2026-11-01 — OpenRouter free-model maintenance
+
+- The withdrawn `nvidia/nemotron-3-super-120b-a12b:free` endpoint and the persistently rate-limited `google/gemma-4-31b-it:free` option were removed from the demo selector.
+- They were replaced with `nvidia/nemotron-3.5-lightning:free` and `cohere/north-mini-code:free` after both completed live zero-price tool-call checks. This is an infrastructure availability update, not a finalized experimental model roster or a research result.
+- OpenRouter routing remains restricted to explicit `:free` IDs, zero-price endpoints, and providers supporting the requested parameters. There is no automatic alternative-model or paid fallback.

@@ -78,7 +78,7 @@ def mock_groq(monkeypatch, isolated_credentials):
     responses = []
 
     def handle(request):
-        assert request.url.host == "api.groq.com"
+        assert str(request.url) == "https://api.groq.com/openai/v1/chat/completions"
         assert request.headers["authorization"] == "Bearer test-secret"
         requests.append(json.loads(request.content))
         return responses.pop(0)
@@ -234,8 +234,8 @@ def test_ui_model_selector_and_api_output_path():
         "groq:qwen/qwen3.8-27b",
         "google:gemini-3.5-flash-lite",
         "google:gemini-3.1-flash-lite",
-        "openrouter:nvidia/nemotron-3-super-120b-a12b:free",
-        "openrouter:google/gemma-4-31b-it:free",
+        "openrouter:nvidia/nemotron-3.5-lightning:free",
+        "openrouter:cohere/north-mini-code:free",
     }
     assert selector["props"]["value"] == "qwen3:4b"
     assert selector["props"]["allow_custom_value"] is True

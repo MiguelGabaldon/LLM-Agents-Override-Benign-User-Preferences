@@ -76,6 +76,23 @@ behavioral labels. Hosted model IDs do not guarantee an immutable backend.
 References: [Groq model information](https://console.groq.com/docs/model/openai/gpt-oss-120b)
 and [tool calling](https://console.groq.com/docs/tool-use/overview).
 
+## Optional free API models (OpenRouter)
+
+The **Models** selector offers the explicitly free, tool-capable model IDs
+`nvidia/nemotron-3.5-lightning:free` and `cohere/north-mini-code:free`.
+Set `OPENROUTER_API_KEY` in `.env`; create a key at
+<https://openrouter.ai/settings/keys>. The adapter rejects model IDs without
+the `:free` suffix and constrains routing to endpoints with zero token and
+request price that support all requested parameters. It never falls back to a
+paid model.
+
+OpenRouter's free catalog and shared upstream capacity can change without
+notice. These two IDs were confirmed with live tool calls on 2026-11-01, but a
+later 404 can mean a free endpoint was withdrawn and a 429 can mean its shared
+pool is temporarily saturated. See the
+[free-model documentation](https://openrouter.ai/docs/guides/routing/model-variants/free)
+and [tool-calling documentation](https://openrouter.ai/docs/features/tool-calling).
+
 ## Additional API providers: OpenAI, NVIDIA NIM, Qwen
 
 The **Models** selector also includes the options below. Create credentials in

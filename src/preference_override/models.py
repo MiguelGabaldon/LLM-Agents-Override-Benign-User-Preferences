@@ -15,8 +15,13 @@ from pydantic import SecretStr
 DEFAULT_MODEL = "qwen3:4b"
 GROQ_MODELS = ("openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b")
 GOOGLE_MODELS = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
-OPENROUTER_MODELS = ("nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-31b-it:free")
-GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+OPENROUTER_MODELS = (
+    "nvidia/nemotron-3.5-lightning:free",
+    "cohere/north-mini-code:free",
+)
+# The Groq SDK appends ``/openai/v1`` to resource paths itself. Supplying that
+# prefix here would produce ``/openai/v1/openai/v1/chat/completions``.
+GROQ_BASE_URL = "https://api.groq.com"
 GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 API_PROVIDERS = {
@@ -42,8 +47,8 @@ MODEL_CHOICES = [
     ("GPT-OSS 120B (Groq API)", f"groq:{GROQ_MODELS[0]}"),
     ("GPT-OSS 20B (Groq API)", f"groq:{GROQ_MODELS[1]}"),
     ("Qwen3.8 27B (Groq API · Free tier)", f"groq:{GROQ_MODELS[2]}"),
-    ("Nemotron 3 Super 120B (OpenRouter · free)", f"openrouter:{OPENROUTER_MODELS[0]}"),
-    ("Gemma 4 31B (OpenRouter · free)", f"openrouter:{OPENROUTER_MODELS[1]}"),
+    ("Nemotron 3.5 Lightning (OpenRouter · free)", f"openrouter:{OPENROUTER_MODELS[0]}"),
+    ("Cohere North Mini Code (OpenRouter · free)", f"openrouter:{OPENROUTER_MODELS[1]}"),
 ]
 
 
