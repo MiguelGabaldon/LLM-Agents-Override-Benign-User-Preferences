@@ -13,9 +13,10 @@ from uuid import uuid4
 
 import gradio as gr
 
-from .agent import run_ollama_agent
+from .agent import run_agent
 from .cli import DEFAULT_SCENARIO_PATH
 from .environment import TransportEnvironment
+from .models import DEFAULT_MODEL, MODEL_CHOICES, model_filename
 from .scenarios import load_scenarios
 from .scoring import score_behavior
 
@@ -28,7 +29,7 @@ def scenario_choices(scenarios_path: Path = DEFAULT_SCENARIO_PATH) -> list[str]:
 
 def _output_path(scenario_id: str, model_name: str) -> Path:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    safe_model_name = model_name.replace(":", "_")
+    safe_model_name = model_filename(model_name)
     return Path("runs") / f"{timestamp}_{scenario_id}_{safe_model_name}.json"
 
 
@@ -53,7 +54,7 @@ def run_selected_scenario(
     def execute() -> None:
         try:
             environment = TransportEnvironment(scenario)
-            trace, assistant_messages = run_ollama_agent(
+            trace, assistant_messages = run_agent(
                 environment=environment,
                 run_id=f"{scenario.scenario_id}_{uuid4().hex[:8]}",
                 model_name=model_name,
@@ -62,7 +63,7 @@ def run_selected_scenario(
             )
             result["trace"] = trace
             result["assistant_messages"] = assistant_messages
-        except Exception as error:  # noqa: BLE001 - Surface local model/server errors in the browser.
+        except Exception as error:  # noqa: BLE001 - Surface model/server errors in the browser.
             result["error"] = f"{type(error).__name__}: {error}"
 
     worker = Thread(target=execute, daemon=True)
@@ -121,7 +122,7 @@ def create_demo() -> gr.Blocks:
     with gr.Blocks(title="Preference Override Pilot") as demo:
         gr.Markdown(
             "# Preference Override Pilot\n"
-            "Run one deterministic transport scenario against a local Ollama model. "
+            "Run one deterministic transport scenario with Ollama locally or an API model. "
             "The progress pane updates after every model or tool step."
         )
         with gr.Row():
@@ -131,7 +132,15 @@ def create_demo() -> gr.Blocks:
                 label="Scenario",
                 info="The scenario controls preference framing, benefit magnitude, and response branch.",
             )
-            model_name = gr.Textbox(label="Ollama model", value="qwen3:4b")
+            model_name = gr.Dropdown(
+                label="Models",
+                choices=MODEL_CHOICES,
+                value=DEFAULT_MODEL,
+                allow_custom_value=True,
+                info="Use Free-tier Google/Groq accounts; quotas apply. "
+                "OpenRouter selections use only free endpoints. "
+                "You can also enter any installed Ollama model name.",
+            )
             max_tool_calls = gr.Slider(
                 minimum=1,
                 maximum=12,
@@ -140,7 +149,7 @@ def create_demo() -> gr.Blocks:
                 label="Maximum tool calls",
             )
         run_button = gr.Button("Run scenario", variant="primary")
-        status = gr.Markdown("Choose a scenario and run it locally.")
+        status = gr.Markdown("Choose a scenario and model, then run it.")
         with gr.Row():
             progress = gr.Textbox(label="Live progress", lines=14, interactive=False)
             transcript = gr.Textbox(label="User-visible assistant transcript", lines=14, interactive=False)
