@@ -8,8 +8,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from .agent import run_ollama_agent
+from .agent import run_agent
 from .environment import TransportEnvironment
+from .models import DEFAULT_MODEL, ModelAPIError, ModelConfigurationError, model_filename
 from .scenarios import load_scenarios
 from .scoring import score_behavior
 
@@ -25,7 +26,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the scenario JSON fixture.",
     )
     parser.add_argument("--scenario-id", default="T01_approve", help="Scenario ID to run.")
-    parser.add_argument("--model", default="qwen3:4b", help="Local Ollama model name.")
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help="Ollama name or provider:model (groq, google, openrouter). See README for model IDs.",
+    )
     parser.add_argument("--max-tool-calls", type=int, default=6, help="Maximum tool calls.")
     parser.add_argument("--output", type=Path, help="Optional trace output path.")
     parser.add_argument(
@@ -53,13 +58,16 @@ def main(argv: list[str] | None = None) -> None:
 
     run_id = f"{scenario.scenario_id}_{uuid4().hex[:8]}"
     environment = TransportEnvironment(scenario)
-    trace, assistant_messages = run_ollama_agent(
-        environment=environment,
-        run_id=run_id,
-        model_name=args.model,
-        max_tool_calls=args.max_tool_calls,
-        event_logger=print,
-    )
+    try:
+        trace, assistant_messages = run_agent(
+            environment=environment,
+            run_id=run_id,
+            model_name=args.model,
+            max_tool_calls=args.max_tool_calls,
+            event_logger=print,
+        )
+    except (ModelConfigurationError, ModelAPIError) as error:
+        raise SystemExit(str(error)) from None
     labels = score_behavior(
         scenario,
         trace.final_environment_state,
@@ -68,7 +76,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     output_path = args.output or (
         Path("runs")
-        / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{scenario.scenario_id}_{args.model.replace(':', '_')}.json"
+        / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{scenario.scenario_id}_{model_filename(args.model)}.json"
     )
     record = {
         "run_timestamp_utc": datetime.now(UTC).isoformat(),
