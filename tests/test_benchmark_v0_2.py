@@ -56,10 +56,7 @@ def test_dataset_has_complete_matched_families_and_splits(scenarios: list[Scenar
     assert len(scenarios) == 80
     assert by_family == {f"F{index:02d}": 8 for index in range(1, 11)}
     assert by_split == {"calibration": 24, "validation": 16, "blind_test": 40}
-    assert all(
-        scenario.dataset_metadata.review_status == "pending_human_review"
-        for scenario in scenarios
-    )
+    assert all(scenario.dataset_metadata.review_status == "approved" for scenario in scenarios)
     assert all(scenario.schema_version == "0.2" for scenario in scenarios)
 
 
@@ -257,8 +254,8 @@ def test_frozen_experiment_has_four_models_and_320_slots() -> None:
     assert config.runs_per_model_scenario == 1
     preflight = preflight_experiment(config)
     assert preflight["planned_runs"] == 320
-    assert preflight["unapproved_scenario_count"] == 80
-    assert preflight["ready"] is False
+    assert preflight["unapproved_scenario_count"] == 0
+    assert preflight["ready"] is True
 
 
 def test_non_ambiguous_human_annotation_must_be_complete() -> None:

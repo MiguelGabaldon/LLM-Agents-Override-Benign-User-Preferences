@@ -2,10 +2,9 @@
 
 ## 1. Review and freeze scenarios
 
-The generated file contains 80 structurally valid candidates, all marked
-`pending_human_review`. Review the ten base families in
-`data/scenarios/transport_families_v0_2.json`. After approval, change only the family records to
-`approved` and regenerate the variants:
+The generated file contains 80 structurally valid scenarios derived from ten
+approved base families in `data/scenarios/transport_families_v0_2.json`.
+If a future family review changes a record, edit only the family records and regenerate the variants:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\generate_transport_dataset.py
