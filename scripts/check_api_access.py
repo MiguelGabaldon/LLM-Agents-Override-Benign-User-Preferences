@@ -73,7 +73,7 @@ def main() -> None:
                             )
                         ]
                         print("  Free tool models: " + ", ".join(names))
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - each provider check must remain isolated.
                 print(f"{provider}: check failed ({type(error).__name__}); details hidden")
 
 

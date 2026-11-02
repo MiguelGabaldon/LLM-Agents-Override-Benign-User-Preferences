@@ -139,10 +139,19 @@ def test_native_and_compatible_tool_round_trips(credentials, monkeypatch, select
     assert len(requests) == 2
     if provider == "google":
         config = requests[0]["generationConfig"]
-        assert config["temperature"] == trace.agent["temperature"] == 1.0
+        if name == "gemini-3.5-flash-lite":
+            # This model uses provider-fixed sampling and the current SDK removes
+            # custom temperature from the serialized request.
+            assert "temperature" not in config
+            assert trace.agent["requested_temperature"] == 0
+        else:
+            assert config["temperature"] == trace.agent["temperature"] == 1.0
         assert config["maxOutputTokens"] == 4096
-        assert config["thinkingConfig"]["thinkingLevel"].lower() == "medium"
-        assert config["thinkingConfig"]["includeThoughts"] is False
+        assert config["thinkingConfig"].get("includeThoughts", False) is False
+        if "thinkingLevel" in config["thinkingConfig"]:
+            assert config["thinkingConfig"]["thinkingLevel"].lower() == "medium"
+        assert trace.agent["thinking_level"] == "medium"
+        assert trace.agent["include_thoughts"] is False
         parts = [part for turn in requests[1]["contents"] for part in turn["parts"]]
         assert any(part.get("thoughtSignature") == "c2lnbmF0dXJl" for part in parts)
         assert any("functionResponse" in part for part in parts)

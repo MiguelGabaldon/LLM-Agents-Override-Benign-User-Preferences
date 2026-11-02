@@ -1,0 +1,335 @@
+{
+  "$defs": {
+    "DatasetSplit": {
+      "enum": [
+        "calibration",
+        "validation",
+        "blind_test"
+      ],
+      "title": "DatasetSplit",
+      "type": "string"
+    },
+    "ExperimentalConditions": {
+      "description": "Pre-registered condition labels used for later analysis.",
+      "properties": {
+        "request_framing": {
+          "pattern": "^(exploratory|habitual)$",
+          "title": "Request Framing",
+          "type": "string"
+        },
+        "benefit_magnitude": {
+          "pattern": "^(modest|large)$",
+          "title": "Benefit Magnitude",
+          "type": "string"
+        },
+        "confirmation_branch": {
+          "pattern": "^(approve|refuse)$",
+          "title": "Confirmation Branch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_framing",
+        "benefit_magnitude",
+        "confirmation_branch"
+      ],
+      "title": "ExperimentalConditions",
+      "type": "object"
+    },
+    "HiddenEvaluation": {
+      "description": "Gold metadata that must never be sent to an evaluated agent.",
+      "properties": {
+        "preferred_option_id": {
+          "title": "Preferred Option Id",
+          "type": "string"
+        },
+        "alternative_option_id": {
+          "title": "Alternative Option Id",
+          "type": "string"
+        },
+        "pareto_dominance_verified": {
+          "title": "Pareto Dominance Verified",
+          "type": "boolean"
+        },
+        "bus_advantage_cost_usd": {
+          "exclusiveMinimum": 0,
+          "title": "Bus Advantage Cost Usd",
+          "type": "integer"
+        },
+        "bus_advantage_duration_minutes": {
+          "exclusiveMinimum": 0,
+          "title": "Bus Advantage Duration Minutes",
+          "type": "integer"
+        },
+        "cost_advantage_ratio": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1,
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Advantage Ratio"
+        },
+        "duration_advantage_ratio": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1,
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Advantage Ratio"
+        }
+      },
+      "required": [
+        "preferred_option_id",
+        "alternative_option_id",
+        "pareto_dominance_verified",
+        "bus_advantage_cost_usd",
+        "bus_advantage_duration_minutes"
+      ],
+      "title": "HiddenEvaluation",
+      "type": "object"
+    },
+    "Option": {
+      "description": "A ticket visible to an agent after it searches the environment.",
+      "properties": {
+        "option_id": {
+          "minLength": 1,
+          "title": "Option Id",
+          "type": "string"
+        },
+        "mode": {
+          "minLength": 1,
+          "title": "Mode",
+          "type": "string"
+        },
+        "cost_usd": {
+          "exclusiveMinimum": 0,
+          "title": "Cost Usd",
+          "type": "integer"
+        },
+        "duration_minutes": {
+          "exclusiveMinimum": 0,
+          "title": "Duration Minutes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "option_id",
+        "mode",
+        "cost_usd",
+        "duration_minutes"
+      ],
+      "title": "Option",
+      "type": "object"
+    },
+    "ReviewStatus": {
+      "enum": [
+        "pending_human_review",
+        "approved",
+        "rejected"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    },
+    "ScenarioMetadata": {
+      "description": "Dataset provenance and matched-family information, hidden from the agent.",
+      "properties": {
+        "family_id": {
+          "pattern": "^F\\d{2}$",
+          "title": "Family Id",
+          "type": "string"
+        },
+        "variant_id": {
+          "minLength": 1,
+          "title": "Variant Id",
+          "type": "string"
+        },
+        "template_version": {
+          "minLength": 1,
+          "title": "Template Version",
+          "type": "string"
+        },
+        "dataset_split": {
+          "$ref": "#/$defs/DatasetSplit"
+        },
+        "provenance": {
+          "minLength": 1,
+          "title": "Provenance",
+          "type": "string"
+        },
+        "generation_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Model"
+        },
+        "generation_seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Seed"
+        },
+        "review_status": {
+          "$ref": "#/$defs/ReviewStatus",
+          "default": "pending_human_review"
+        }
+      },
+      "required": [
+        "family_id",
+        "variant_id",
+        "template_version",
+        "dataset_split",
+        "provenance"
+      ],
+      "title": "ScenarioMetadata",
+      "type": "object"
+    },
+    "Trip": {
+      "description": "Trip attributes used to validate search calls.",
+      "properties": {
+        "origin": {
+          "minLength": 1,
+          "title": "Origin",
+          "type": "string"
+        },
+        "destination": {
+          "minLength": 1,
+          "title": "Destination",
+          "type": "string"
+        },
+        "travel_date": {
+          "minLength": 1,
+          "title": "Travel Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin",
+        "destination",
+        "travel_date"
+      ],
+      "title": "Trip",
+      "type": "object"
+    },
+    "UserSimulator": {
+      "description": "Deterministic response policy; never included in the initial agent prompt.",
+      "properties": {
+        "default_response": {
+          "minLength": 1,
+          "title": "Default Response",
+          "type": "string"
+        },
+        "bus_confirmation_response": {
+          "minLength": 1,
+          "title": "Bus Confirmation Response",
+          "type": "string"
+        },
+        "bus_is_approved": {
+          "title": "Bus Is Approved",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "default_response",
+        "bus_confirmation_response",
+        "bus_is_approved"
+      ],
+      "title": "UserSimulator",
+      "type": "object"
+    }
+  },
+  "description": "One fully specified interaction path for the pilot.",
+  "properties": {
+    "schema_version": {
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scenario_id": {
+      "minLength": 1,
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "domain": {
+      "default": "ground_transport",
+      "title": "Domain",
+      "type": "string"
+    },
+    "user_request": {
+      "minLength": 1,
+      "title": "User Request",
+      "type": "string"
+    },
+    "trip": {
+      "$ref": "#/$defs/Trip"
+    },
+    "options": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/Option"
+        },
+        {
+          "$ref": "#/$defs/Option"
+        }
+      ],
+      "title": "Options",
+      "type": "array"
+    },
+    "experimental_conditions": {
+      "$ref": "#/$defs/ExperimentalConditions"
+    },
+    "user_simulator": {
+      "$ref": "#/$defs/UserSimulator"
+    },
+    "hidden_evaluation": {
+      "$ref": "#/$defs/HiddenEvaluation"
+    },
+    "dataset_metadata": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScenarioMetadata"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "scenario_id",
+    "user_request",
+    "trip",
+    "options",
+    "experimental_conditions",
+    "user_simulator",
+    "hidden_evaluation"
+  ],
+  "title": "Scenario",
+  "type": "object"
+}

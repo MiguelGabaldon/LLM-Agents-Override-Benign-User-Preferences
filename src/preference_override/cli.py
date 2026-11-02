@@ -10,11 +10,12 @@ from uuid import uuid4
 
 from .agent import run_agent
 from .environment import TransportEnvironment
+from .evaluation import evaluate_trajectory
 from .models import DEFAULT_MODEL, ModelAPIError, ModelConfigurationError, model_filename
 from .scenarios import load_scenarios
 from .scoring import score_behavior
 
-DEFAULT_SCENARIO_PATH = Path("data/scenarios/transport_pilot_v0.json")
+DEFAULT_SCENARIO_PATH = Path("data/scenarios/transport_pilot_v0_2.json")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,7 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SCENARIO_PATH,
         help="Path to the scenario JSON fixture.",
     )
-    parser.add_argument("--scenario-id", default="T01_approve", help="Scenario ID to run.")
+    parser.add_argument(
+        "--scenario-id",
+        help="Scenario ID to run. Defaults to the first record in the selected fixture.",
+    )
     parser.add_argument(
         "--model",
         default=DEFAULT_MODEL,
@@ -51,10 +55,11 @@ def main(argv: list[str] | None = None) -> None:
             )
         return
 
-    scenario = next((item for item in scenarios if item.scenario_id == args.scenario_id), None)
+    scenario_id = args.scenario_id or scenarios[0].scenario_id
+    scenario = next((item for item in scenarios if item.scenario_id == scenario_id), None)
     if scenario is None:
         available = ", ".join(item.scenario_id for item in scenarios)
-        raise SystemExit(f"Unknown scenario ID '{args.scenario_id}'. Available: {available}")
+        raise SystemExit(f"Unknown scenario ID '{scenario_id}'. Available: {available}")
 
     run_id = f"{scenario.scenario_id}_{uuid4().hex[:8]}"
     environment = TransportEnvironment(scenario)
@@ -74,6 +79,7 @@ def main(argv: list[str] | None = None) -> None:
         assistant_messages,
         termination_reason=trace.termination_reason,
     )
+    evaluation = evaluate_trajectory(scenario, trace, assistant_messages)
     output_path = args.output or (
         Path("runs")
         / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{scenario.scenario_id}_{model_filename(args.model)}.json"
@@ -84,12 +90,22 @@ def main(argv: list[str] | None = None) -> None:
         "experimental_conditions": scenario.experimental_conditions.model_dump(),
         "assistant_messages": assistant_messages,
         "behavioral_labels": labels.model_dump(),
+        "evaluation": evaluation.model_dump(mode="json"),
         "trace": trace.model_dump(mode="json"),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
 
-    print(json.dumps({"output_path": str(output_path), **labels.model_dump()}, indent=2))
+    print(
+        json.dumps(
+            {
+                "output_path": str(output_path),
+                "behavioral_labels_v0_1": labels.model_dump(),
+                "evaluation_v0_2": evaluation.model_dump(mode="json"),
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

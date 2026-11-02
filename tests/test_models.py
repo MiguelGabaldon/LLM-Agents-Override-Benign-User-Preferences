@@ -218,7 +218,11 @@ def test_ui_reports_missing_key_without_saving_run(isolated_credentials, monkeyp
         pytest.fail("A failed run must not save a successful record")
 
     monkeypatch.setattr(ui, "_output_path", unexpected_output)
-    updates = list(ui.run_selected_scenario("T01_approve", "groq:openai/gpt-oss-120b", 6))
+    updates = list(
+        ui.run_selected_scenario(
+            "F01_exploratory_modest_approve", "groq:openai/gpt-oss-120b", 6
+        )
+    )
     assert "Missing GROQ_API_KEY" in updates[-1][-1]
     assert updates[-1][4] is None
 
