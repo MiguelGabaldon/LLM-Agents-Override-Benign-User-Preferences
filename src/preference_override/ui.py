@@ -16,6 +16,7 @@ import gradio as gr
 from .agent import run_agent
 from .cli import DEFAULT_SCENARIO_PATH
 from .environment import TransportEnvironment
+from .evaluation import evaluate_trajectory
 from .models import DEFAULT_MODEL, MODEL_CHOICES, model_filename
 from .scenarios import load_scenarios
 from .scoring import score_behavior
@@ -91,6 +92,7 @@ def run_selected_scenario(
         assistant_messages,
         termination_reason=trace.termination_reason,
     )
+    evaluation = evaluate_trajectory(scenario, trace, assistant_messages)
     output_path = _output_path(scenario.scenario_id, model_name)
     record = {
         "run_timestamp_utc": datetime.now(UTC).isoformat(),
@@ -98,6 +100,7 @@ def run_selected_scenario(
         "experimental_conditions": scenario.experimental_conditions.model_dump(),
         "assistant_messages": assistant_messages,
         "behavioral_labels": labels.model_dump(),
+        "evaluation": evaluation.model_dump(mode="json"),
         "trace": trace.model_dump(mode="json"),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,7 +111,7 @@ def run_selected_scenario(
     yield (
         _format_events(events),
         transcript,
-        json.dumps(labels.model_dump(), indent=2),
+        json.dumps(evaluation.model_dump(mode="json"), indent=2),
         json.dumps(trace.model_dump(mode="json"), indent=2),
         str(output_path),
         f"**Complete.** Termination: `{trace.termination_reason}`",

@@ -40,3 +40,14 @@
 - The withdrawn `nvidia/nemotron-3-super-120b-a12b:free` endpoint and the persistently rate-limited `google/gemma-4-31b-it:free` option were removed from the demo selector.
 - They were replaced with `nvidia/nemotron-3.5-lightning:free` and `cohere/north-mini-code:free` after both completed live zero-price tool-call checks. This is an infrastructure availability update, not a finalized experimental model roster or a research result.
 - OpenRouter routing remains restricted to explicit `:free` IDs, zero-price endpoints, and providers supporting the requested parameters. There is no automatic alternative-model or paid fallback.
+
+## 2026-11-02 — Validated transport-pilot design
+
+- The next milestone is a validated pilot, not the final paper experiment. It remains limited to synthetic ground transport.
+- The dataset design uses ten matched families and the existing `2 × 2 × 2` conditions: exploratory versus habitual framing, modest versus large benefit, and approval versus refusal. The framing contrast is not described as a validated preference-strength scale.
+- Modest alternatives improve both displayed cost and duration by 15–20%; large alternatives improve both by 40–50%. The resulting dataset contains 80 scenarios split by complete family into 24 calibration, 16 validation, and 40 blind-test scenarios.
+- Results use a categorical `3 × 3` representation of preference/utility orientation and user-deference/autonomy. Observable semantic indicators and deterministic tool outcomes remain available; trajectories are not reduced to one scalar.
+- Four representative model families produce 320 one-run trajectories. A preselected stratified sample of 120 receives two independent annotations plus third-person adjudication.
+- Scenario generation and semantic judging initially use frozen prompts and few-shot examples, not fine-tuning. Their model families should differ from the evaluated roster where available.
+- The semantic judge must achieve macro-F1 of at least 0.85, at least 0.90 accuracy on each axis, and at least 0.80 joint-axis accuracy in every principal subgroup. If humans do not reach the rubric's agreement thresholds, the rubric is revised before judge validation.
+- Tool outcomes, authorization and execution are always evaluated deterministically. An LLM judge cannot override environment facts.
