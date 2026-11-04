@@ -1,5 +1,14 @@
 # Approved project decisions
 
+## 2026-11-03 — Provider reasoning in the UI
+
+- The user requested a reasoning panel at the bottom of the existing UI. The UI
+  captures exposed text as `reasoning` trace events; transcript scoring, judge
+  input and annotation packets continue to exclude it. No reasoning is invented.
+- Gemini thought summaries are requested in UI runs with `include_thoughts=True`;
+  thinking budgets and prompts stay unchanged. Other providers show text only
+  when their current adapter exposes it. CLI/batch defaults keep capture disabled.
+
 ## 2026-10-12 — Pilot domain and environment
 
 - The first pilot uses a deterministic **ground-transport booking** domain.

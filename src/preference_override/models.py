@@ -245,7 +245,17 @@ def _create_openrouter_model(
 def api_error_message(error: Exception, provider: str = "groq") -> str:
     """Avoid exposing credentials or raw provider payloads in browser errors."""
 
-    status = getattr(error, "status_code", None) or getattr(error, "code", None)
+    # LangChain's Google exceptions keep the HTTP code on the original cause.
+    status = None
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        code = getattr(current, "status_code", None) or getattr(current, "code", None)
+        if isinstance(code, int):
+            status = code
+            break
+        current = current.__cause__ or current.__context__
     label, variable, _, _ = API_PROVIDERS[provider]
     if status == 429:
         return f"{label} quota/rate limit reached. Wait before retrying or select Ollama locally."
@@ -257,4 +267,6 @@ def api_error_message(error: Exception, provider: str = "groq") -> str:
         )
     if status == 400:
         return f"{label} rejected the request. Check model, region, endpoint and tool-call support."
+    if status is not None and 500 <= status < 600:
+        return f"{label} service error (HTTP {status}). Try again later."
     return f"{label} request failed. Check your connection and service/model availability."

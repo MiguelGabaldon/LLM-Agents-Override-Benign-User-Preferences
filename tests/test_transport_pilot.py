@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from threading import Event
 
 import pytest
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from pydantic import ValidationError
 
 import preference_override.agent as agent_module
@@ -12,7 +14,7 @@ import preference_override.ui as ui_module
 from preference_override.agent import SYSTEM_PROMPT, build_tools, user_visible_content
 from preference_override.environment import TransportEnvironment
 from preference_override.scenarios import load_scenarios
-from preference_override.schemas import RunTrace, Scenario
+from preference_override.schemas import RunTrace, Scenario, TraceEvent
 from preference_override.scoring import score_behavior
 
 SCENARIO_PATH = Path("data/scenarios/transport_pilot_v0_2.json")
@@ -95,7 +97,7 @@ def test_search_normalizes_supported_natural_language_date(scenarios: list[Scena
 
 def test_agent_contract_requires_tool_mediated_user_questions(scenarios: list[Scenario]) -> None:
     assert "MUST call ask_user" in SYSTEM_PROMPT
-    assert "authorizes booking the user's preferred train" in SYSTEM_PROMPT
+    assert "The initial request authorizes booking" in SYSTEM_PROMPT
     ask_user_tool = next(
         tool for tool in build_tools(TransportEnvironment(scenarios[0])) if tool.name == "ask_user"
     )
@@ -234,14 +236,30 @@ def test_agent_logs_tool_progress_and_marks_an_empty_final_turn_incomplete(
 def test_local_interface_streams_events_and_writes_a_run_record(
     monkeypatch: pytest.MonkeyPatch, scenarios: list[Scenario], tmp_path: Path
 ) -> None:
-    def fake_run_ollama_agent(environment, run_id, model_name, max_tool_calls, event_logger):
+    def fake_run_ollama_agent(
+        environment,
+        run_id,
+        model_name,
+        max_tool_calls,
+        event_logger,
+        event_callback,
+        final_response_after_booking,
+        capture_reasoning,
+    ):
+        assert final_response_after_booking is True
+        assert capture_reasoning is True
         event_logger("[step 1] model: invoking")
         event_logger("[step 1] assistant: Visible response")
+        event = TraceEvent(
+            step=1, event_type="assistant_message", payload={"content": "Visible response"}
+        )
+        event_callback(event)
         return (
             RunTrace(
                 run_id=run_id,
                 scenario_id=environment.scenario.scenario_id,
                 agent={"provider": "test", "model_name": model_name},
+                events=[event],
                 final_environment_state=environment.state,
                 termination_reason="agent_finished",
             ),
@@ -256,7 +274,409 @@ def test_local_interface_streams_events_and_writes_a_run_record(
     final_update = updates[-1]
 
     assert any("model: invoking" in update[0] for update in updates)
-    assert final_update[1] == "Visible response"
+    assert final_update[1] == [
+        {"role": "user", "content": scenarios[0].user_request},
+        {"role": "assistant", "content": "Visible response"},
+    ]
     assert '"trajectory_status": "completed"' in final_update[2]
     assert final_update[4] == str(output_path)
     assert output_path.exists()
+
+
+def _final_response_status(trace):
+    events = trace["events"] if isinstance(trace, dict) else [e.model_dump() for e in trace.events]
+    return next(
+        (e["payload"]["status"] for e in events if e["event_type"] == "final_response"),
+        "not_requested",
+    )
+
+
+@pytest.fixture
+def scenario():
+    return load_scenarios(Path("data/scenarios/transport_pilot_v0_2.json"))[0]
+
+
+def call(name, args, call_id):
+    return {"name": name, "args": args, "id": call_id}
+
+
+def search_call(scenario):
+    return call("search_transport_options", scenario.trip.model_dump(), "search")
+
+
+def scripted_model(monkeypatch, responses):
+    class Model:
+        def __init__(self):
+            self.responses = iter(responses)
+            self.inputs = []
+
+        def bind_tools(self, tools):
+            return self
+
+        def invoke(self, messages):
+            self.inputs.append(list(messages))
+            response = next(self.responses)
+            if isinstance(response, Exception):
+                raise response
+            return response(messages) if callable(response) else response
+
+    model = Model()
+    monkeypatch.setattr(
+        agent_module,
+        "create_model",
+        lambda *_: (model, {"provider": "ollama", "model_name": "test"}),
+    )
+    return model
+
+
+def test_final_turn_receives_every_result_and_does_not_execute_later_calls(monkeypatch, scenario):
+    calls = [
+        call("book_transport_option", {"option_id": "train_001"}, "book"),
+        call("ask_user", {"question": "One more question?"}, "late-question"),
+    ]
+    model = scripted_model(
+        monkeypatch,
+        [
+            AIMessage(content="", tool_calls=[search_call(scenario)]),
+            AIMessage(content="", tool_calls=calls),
+            AIMessage(content="Your train ticket is booked."),
+        ],
+    )
+    observed = []
+    trace, visible = agent_module.run_agent(
+        TransportEnvironment(scenario),
+        "final-turn",
+        max_tool_calls=2,
+        event_callback=observed.append,
+        final_response_after_booking=True,
+    )
+    assert visible == ["Your train ticket is booked."]
+    assert _final_response_status(trace) == "completed"
+    assert trace.termination_reason == "booking_succeeded"
+    assert trace.final_environment_state.user_questions == []
+    assert len(trace.final_environment_state.booking_attempts) == 1
+    final_history = model.inputs[-1]
+    assert isinstance(final_history[-1], ToolMessage)
+    assert sum(message.type == "human" for message in final_history) == 1
+    results = [message for message in final_history if isinstance(message, ToolMessage)]
+    assert [message.tool_call_id for message in results] == ["search", "book", "late-question"]
+    assert results[-1].status == "error"
+    conversation = ui_module._conversation(scenario.user_request, observed)
+    assert [message["content"] for message in conversation] == [
+        scenario.user_request,
+        "Your train ticket is booked.",
+    ]
+
+
+def test_bad_arguments_are_returned_as_tool_feedback_and_kept_in_trace(monkeypatch, scenario):
+    model = scripted_model(
+        monkeypatch,
+        [
+            AIMessage(content="", tool_calls=[call("search_transport_options", {}, "bad")]),
+            AIMessage(content="", tool_calls=[search_call(scenario)]),
+            AIMessage(
+                content="",
+                tool_calls=[call("book_transport_option", {"option_id": "train_001"}, "book")],
+            ),
+        ],
+    )
+    trace, _ = agent_module.run_agent(TransportEnvironment(scenario), "bad-args")
+    assert trace.termination_reason == "booking_succeeded"
+    feedback = model.inputs[1][-1]
+    assert isinstance(feedback, ToolMessage)
+    assert feedback.tool_call_id == "bad"
+    assert feedback.status == "error"
+    assert json.loads(feedback.content)["reason"] == "Invalid tool arguments."
+    assert trace.events[1].payload["result"]["validation_errors"]
+    assert _final_response_status(trace) == "not_requested"  # batch behavior is preserved
+
+
+def test_tool_limit_pairs_all_results_without_executing_excess_calls(monkeypatch, scenario):
+    scripted_model(
+        monkeypatch,
+        [
+            AIMessage(
+                content="",
+                tool_calls=[
+                    search_call(scenario),
+                    call("book_transport_option", {"option_id": "train_001"}, "over-limit"),
+                ],
+            )
+        ],
+    )
+    trace, _ = agent_module.run_agent(TransportEnvironment(scenario), "limit", max_tool_calls=1)
+    assert trace.termination_reason == "incomplete_max_tool_calls"
+    assert trace.final_environment_state.successful_booking is None
+    results = [event for event in trace.events if event.event_type == "tool_result"]
+    assert [event.payload["tool_call_id"] for event in results] == ["search", "over-limit"]
+    assert results[-1].payload["result"]["status"] == "error"
+
+
+@pytest.mark.parametrize(
+    "last_response, status",
+    [
+        (RuntimeError("private exception payload"), "failed"),
+        (AIMessage(content=""), "empty"),
+        (
+            AIMessage(
+                content="",
+                tool_calls=[
+                    call(
+                        "book_transport_option", {"option_id": "bus_001"}, "forbidden-final-action"
+                    )
+                ],
+            ),
+            "invalid_tool_call",
+        ),
+    ],
+)
+def test_final_response_failure_preserves_successful_booking(
+    monkeypatch, scenario, last_response, status
+):
+    scripted_model(
+        monkeypatch,
+        [
+            AIMessage(content="", tool_calls=[search_call(scenario)]),
+            AIMessage(
+                content="",
+                tool_calls=[call("book_transport_option", {"option_id": "train_001"}, "book")],
+            ),
+            last_response,
+        ],
+    )
+    trace, visible = agent_module.run_agent(
+        TransportEnvironment(scenario), "failed-final", final_response_after_booking=True
+    )
+    assert trace.termination_reason == "booking_succeeded"
+    assert _final_response_status(trace) == status
+    assert trace.final_environment_state.successful_booking == "train_001"
+    assert len(trace.final_environment_state.booking_attempts) == 1
+    assert visible == []
+    assert "private exception payload" not in trace.model_dump_json()
+
+
+def test_later_model_failure_retains_partial_interaction(monkeypatch, scenario):
+    scripted_model(
+        monkeypatch,
+        [
+            AIMessage(content="I will look at the options.", tool_calls=[search_call(scenario)]),
+            RuntimeError("private failure detail"),
+        ],
+    )
+    trace, visible = agent_module.run_agent(TransportEnvironment(scenario), "partial")
+    assert trace.termination_reason == "incomplete_model_error"
+    assert trace.final_environment_state.search_performed
+    assert visible == ["I will look at the options."]
+    assert any(event.event_type == "tool_result" for event in trace.events)
+    assert "private failure detail" not in trace.model_dump_json()
+
+
+@pytest.mark.parametrize("branch", ["approve", "refuse"])
+def test_ui_streams_actual_dialogue_before_final_response(monkeypatch, tmp_path, branch):
+    scenario = next(
+        item
+        for item in load_scenarios(Path("data/scenarios/transport_pilot_v0_2.json"))
+        if item.scenario_id == f"F01_exploratory_modest_{branch}"
+    )
+    question = "The bus is cheaper and faster. Should I book it?"
+    allow_final = Event()
+
+    def book_from_answer(messages):
+        answer = json.loads(messages[-1].content)
+        return AIMessage(
+            content="",
+            tool_calls=[
+                call(
+                    "book_transport_option",
+                    {
+                        "option_id": answer["approved_option_id"] or "train_001",
+                        "authorization_token": answer["authorization_token"],
+                    },
+                    "book",
+                )
+            ],
+        )
+
+    def final_response(messages):
+        assert allow_final.wait(timeout=5), "UI did not expose the dialogue while running"
+        return AIMessage(content="Your ticket is booked.")
+
+    scripted_model(
+        monkeypatch,
+        [
+            AIMessage(content="I will compare the tickets.", tool_calls=[search_call(scenario)]),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    call(
+                        "ask_user",
+                        {
+                            "question": question,
+                            "options_under_consideration": ["bus_001"],
+                        },
+                        "ask",
+                    )
+                ],
+            ),
+            book_from_answer,
+            final_response,
+        ],
+    )
+    path = tmp_path / "run.json"
+    monkeypatch.setattr(ui_module, "_output_path", lambda *_: path)
+    updates = []
+    for update in ui_module.run_selected_scenario(scenario.scenario_id, "test", 6):
+        updates.append(update)
+        if any(
+            message["content"] == scenario.user_simulator.bus_confirmation_response
+            for message in update[1]
+        ):
+            assert update[-1] == "**Running...**" or allow_final.is_set()
+            allow_final.set()
+    assert allow_final.is_set()
+    assert any(len(update[1]) > 1 and update[-1] == "**Running...**" for update in updates)
+    assert updates[-1][1] == [
+        {"role": "user", "content": scenario.user_request},
+        {"role": "assistant", "content": "I will compare the tickets."},
+        {"role": "assistant", "content": question},
+        {"role": "user", "content": scenario.user_simulator.bus_confirmation_response},
+        {"role": "assistant", "content": "Your ticket is booked."},
+    ]
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert _final_response_status(record["trace"]) == "completed"
+    assert record["trace"]["agent"]["final_response_after_booking"] is True
+    assert record["trace"]["final_environment_state"]["successful_booking"] == (
+        "bus_001" if branch == "approve" else "train_001"
+    )
+    assert "auth_" not in json.dumps(updates[-1][1])
+
+
+def test_save_failure_keeps_conversation_and_trace_visible(monkeypatch, tmp_path, scenario):
+    scripted_model(
+        monkeypatch,
+        [
+            AIMessage(content="", tool_calls=[search_call(scenario)]),
+            AIMessage(
+                content="",
+                tool_calls=[call("book_transport_option", {"option_id": "train_001"}, "book")],
+            ),
+            AIMessage(content="Your train is booked."),
+        ],
+    )
+    blocked = tmp_path / "not-a-directory"
+    blocked.write_text("blocked", encoding="utf-8")
+    monkeypatch.setattr(ui_module, "_output_path", lambda *_: blocked / "run.json")
+    result = list(ui_module.run_selected_scenario(scenario.scenario_id, "test", 6))[-1]
+    assert result[1][-1]["content"] == "Your train is booked."
+    assert _final_response_status(json.loads(result[3])) == "completed"
+    assert result[4] is None
+    assert "Could not save" in result[-1]
+
+
+def test_unclosed_reasoning_is_not_shown_as_a_final_message():
+    assert agent_module.user_visible_content(AIMessage(content="<think>private reasoning")) == ""
+
+
+def test_unexpected_ui_failure_preserves_received_messages_and_trace(
+    monkeypatch, tmp_path, scenario
+):
+    def fail_after_message(*args, event_callback, **kwargs):
+        event_callback(
+            TraceEvent(
+                step=1,
+                event_type="assistant_message",
+                payload={"content": "I will check the tickets."},
+            )
+        )
+        raise RuntimeError("private provider payload")
+
+    output = tmp_path / "partial.json"
+    monkeypatch.setattr(ui_module, "run_agent", fail_after_message)
+    monkeypatch.setattr(ui_module, "_output_path", lambda *_: output)
+    last = list(ui_module.run_selected_scenario(scenario.scenario_id, "test", 6))[-1]
+    assert last[1][-1]["content"] == "I will check the tickets."
+    assert "Run failed" in last[-1]
+    record = json.loads(output.read_text(encoding="utf-8"))
+    assert record["trace"]["termination_reason"] == "incomplete_runtime_error"
+    assert "private provider payload" not in json.dumps(record)
+
+
+@pytest.mark.parametrize(
+    "response, expected",
+    [
+        (
+            AIMessage(
+                content="Visible", additional_kwargs={"reasoning_content": "Exposed reasoning"}
+            ),
+            "Exposed reasoning",
+        ),
+        (
+            AIMessage(
+                content=[
+                    {"type": "reasoning", "reasoning": "Exposed reasoning"},
+                    {"type": "text", "text": "Visible"},
+                ]
+            ),
+            "Exposed reasoning",
+        ),
+        (AIMessage(content="<think>Exposed reasoning</think>Visible"), "Exposed reasoning"),
+        (AIMessage(content="Exposed reasoning</think>Visible"), "Exposed reasoning"),
+        (AIMessage(content="<think>Exposed reasoning"), "Exposed reasoning"),
+        (AIMessage(content=[{"type": "reasoning", "encrypted_content": "opaque-data"}]), ""),
+        (AIMessage(content="Visible"), ""),
+    ],
+)
+def test_reasoning_extraction_uses_only_exposed_text(response, expected):
+    assert agent_module.provider_reasoning(response) == expected
+    assert "Exposed reasoning" not in agent_module.user_visible_content(response)
+
+
+def test_ui_reasoning_is_below_conversation_and_excluded_from_scoring(
+    monkeypatch, tmp_path, scenario
+):
+    from preference_override.judge import sanitized_judge_payload
+
+    reasoning = "PROVIDER_REASONING: I recommend the bus because it is cheaper."
+    model = scripted_model(
+        monkeypatch,
+        [
+            AIMessage(
+                content="I will compare the tickets.",
+                additional_kwargs={"reasoning_content": reasoning},
+            )
+        ],
+    )
+    path = tmp_path / "reasoning.json"
+    monkeypatch.setattr(ui_module, "_output_path", lambda *_: path)
+    updates = list(ui_module.run_selected_scenario(scenario.scenario_id, "test", 6))
+    last = updates[-1]
+    assert reasoning in last[-2]
+    assert any(reasoning in update[-2] and update[-1] == "**Running...**" for update in updates)
+    assert reasoning not in json.dumps(last[1])
+    assert reasoning not in last[0]  # ordinary progress remains separate too
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert record["assistant_messages"] == ["I will compare the tickets."]
+    assert record["evaluation"]["semantic"]["alternative_disclosed"] is False
+    trace = RunTrace.model_validate(record["trace"])
+    payload = sanitized_judge_payload(scenario, trace, record["assistant_messages"])
+    assert reasoning not in json.dumps(payload)
+    assert len(model.inputs[0]) == 2  # no additional prompt asks for reasoning
+    components = ui_module.create_demo().config["components"]
+    reasoning_index = next(
+        i
+        for i, c in enumerate(components)
+        if c["props"].get("label") == "Provider reasoning / thought summary (if available)"
+    )
+    record_index = next(
+        i for i, c in enumerate(components) if c["props"].get("label") == "Saved run record"
+    )
+    assert reasoning_index > record_index
+
+
+def test_ui_reports_reasoning_unavailable_when_provider_returns_none(
+    monkeypatch, tmp_path, scenario
+):
+    scripted_model(monkeypatch, [AIMessage(content="Visible response.")])
+    monkeypatch.setattr(ui_module, "_output_path", lambda *_: tmp_path / "run.json")
+    last = list(ui_module.run_selected_scenario(scenario.scenario_id, "test", 6))[-1]
+    assert last[-2] == "No reasoning text was returned by this model/provider."
