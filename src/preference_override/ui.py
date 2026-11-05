@@ -17,8 +17,16 @@ from .agent import run_agent
 from .cli import DEFAULT_SCENARIO_PATH
 from .environment import TransportEnvironment
 from .evaluation import evaluate_trajectory
-from .models import DEFAULT_MODEL, MODEL_CHOICES, model_filename
+from .models import (
+    DEFAULT_MODEL,
+    MODEL_CHOICES,
+    ModelAPIError,
+    ModelConfigurationError,
+    model_filename,
+    resolve_model,
+)
 from .scenarios import load_scenarios
+from .schemas import RunTrace, TraceEvent
 from .scoring import score_behavior
 
 
@@ -29,7 +37,7 @@ def scenario_choices(scenarios_path: Path = DEFAULT_SCENARIO_PATH) -> list[str]:
 
 
 def _output_path(scenario_id: str, model_name: str) -> Path:
-    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     safe_model_name = model_filename(model_name)
     return Path("runs") / f"{timestamp}_{scenario_id}_{safe_model_name}.json"
 
@@ -38,51 +46,122 @@ def _format_events(events: list[str]) -> str:
     return "\n".join(events) if events else "Waiting for the model to begin..."
 
 
+def _conversation(user_request: str, events: list[TraceEvent]) -> list[dict[str, str]]:
+    messages = [{"role": "user", "content": user_request}]
+    for event in events:
+        payload = event.payload
+        if event.event_type == "assistant_message":
+            role, content = "assistant", payload.get("content")
+        elif event.event_type == "tool_call" and payload.get("tool_name") == "ask_user":
+            if not payload.get("execution_allowed", True):
+                continue
+            role, content = "assistant", payload["arguments"].get("question")
+        elif event.event_type == "tool_result" and payload.get("tool_name") == "ask_user":
+            role, content = "user", payload["result"].get("response")
+        else:
+            continue
+        if isinstance(content, str) and content.strip():
+            messages.append({"role": role, "content": content})
+    return messages
+
+
+def _reasoning(events: list[TraceEvent]) -> str:
+    return (
+        "\n\n".join(
+            f"Step {event.step} ({event.payload.get('phase', 'action')})\n{event.payload['content']}"
+            for event in events
+            if event.event_type == "reasoning"
+        )
+        or "No reasoning text was returned by this model/provider."
+    )
+
+
 def run_selected_scenario(
     scenario_id: str, model_name: str, max_tool_calls: float
-) -> Generator[tuple[str, str, str, str, str | None, str], None, None]:
+) -> Generator[tuple[str, list[dict[str, str]], str, str, str | None, str, str], None, None]:
     """Run in a worker thread and yield step-level updates to the interface."""
 
     scenarios = load_scenarios(DEFAULT_SCENARIO_PATH)
     scenario = next((item for item in scenarios if item.scenario_id == scenario_id), None)
     if scenario is None:
-        yield "", "", "", "", None, f"**Error:** unknown scenario `{scenario_id}`."
+        yield "", [], "", "", None, "", f"**Error:** unknown scenario `{scenario_id}`."
         return
 
-    progress_queue: Queue[str] = Queue()
+    progress_queue: Queue[str | TraceEvent] = Queue()
     result: dict[str, Any] = {}
+    environment = TransportEnvironment(scenario)
+    run_id = f"{scenario.scenario_id}_{uuid4().hex[:8]}"
 
     def execute() -> None:
         try:
-            environment = TransportEnvironment(scenario)
             trace, assistant_messages = run_agent(
                 environment=environment,
-                run_id=f"{scenario.scenario_id}_{uuid4().hex[:8]}",
+                run_id=run_id,
                 model_name=model_name,
                 max_tool_calls=int(max_tool_calls),
                 event_logger=progress_queue.put,
+                event_callback=progress_queue.put,
+                final_response_after_booking=True,
+                capture_reasoning=True,
             )
             result["trace"] = trace
             result["assistant_messages"] = assistant_messages
-        except Exception as error:  # noqa: BLE001 - Surface model/server errors in the browser.
+        except (ModelAPIError, ModelConfigurationError) as error:
             result["error"] = f"{type(error).__name__}: {error}"
+        except Exception as error:  # noqa: BLE001 - keep unexpected error payloads out of the UI.
+            result["error"] = f"{type(error).__name__}: Unexpected runtime error."
 
     worker = Thread(target=execute, daemon=True)
     worker.start()
     events = ["Run started."]
-    yield _format_events(events), "", "", "", None, "**Running...**"
+    received_events: list[TraceEvent] = []
+    conversation = _conversation(scenario.user_request, received_events)
+    reasoning = "Waiting for provider reasoning..."
+    yield _format_events(events), conversation, "", "", None, reasoning, "**Running...**"
 
     while worker.is_alive() or not progress_queue.empty():
         try:
-            events.append(progress_queue.get(timeout=0.25))
-            yield _format_events(events), "", "", "", None, "**Running...**"
+            event = progress_queue.get(timeout=0.5)
+            if isinstance(event, TraceEvent):
+                received_events.append(event)
+                conversation = _conversation(scenario.user_request, received_events)
+                if event.event_type == "reasoning":
+                    reasoning = _reasoning(received_events)
+            else:
+                events.append(event)
         except Empty:
-            continue
+            pass
+        # Keep the conversation on screen while a model/tool is working; the
+        # generator also stays responsive when a model has not returned yet.
+        yield _format_events(events), conversation, "", "", None, reasoning, "**Running...**"
 
     if "error" in result:
         events.append(f"Run failed: {result['error']}")
-        yield _format_events(events), "", "", "", None, f"**Run failed:** {result['error']}"
-        return
+        if not received_events:
+            yield (
+                _format_events(events),
+                conversation,
+                "",
+                "",
+                None,
+                _reasoning(received_events),
+                f"**Run failed:** {result['error']}",
+            )
+            return
+        provider, name = resolve_model(model_name)
+        result["trace"] = RunTrace(
+            run_id=run_id,
+            scenario_id=scenario.scenario_id,
+            agent={"provider": provider, "model_name": name, "configuration_incomplete": True},
+            events=received_events,
+            final_environment_state=environment.state,
+            termination_reason="incomplete_runtime_error",
+        )
+        result["assistant_messages"] = [
+            event.payload["content"]
+            for event in received_events
+            if event.event_type == "assistant_message"
+        ]
 
     trace = result["trace"]
     assistant_messages = result["assistant_messages"]
@@ -103,18 +182,41 @@ def run_selected_scenario(
         "evaluation": evaluation.model_dump(mode="json"),
         "trace": trace.model_dump(mode="json"),
     }
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
-
-    events.append(f"Saved run record: {output_path}")
-    transcript = "\n\n".join(assistant_messages) or "No user-visible assistant message."
+    if "error" in result:
+        record["error"] = result["error"]
+    saved_path = None
+    save_error = None
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+        saved_path = str(output_path)
+        events.append(f"Saved run record: {output_path}")
+    except OSError as error:
+        save_error = f"Could not save run record ({type(error).__name__})."
+        events.append(save_error)
+    conversation = _conversation(scenario.user_request, trace.events)
+    final_status = next(
+        (event.payload["status"] for event in trace.events if event.event_type == "final_response"),
+        "not_requested",
+    )
+    if "error" in result:
+        status = f"**Run failed:** {result['error']}. Partial trace retained."
+    elif trace.termination_reason.startswith("incomplete_"):
+        status = f"**Incomplete.** Termination: `{trace.termination_reason}`"
+    elif final_status in {"empty", "failed", "invalid_tool_call"}:
+        status = f"**Booking completed.** Final response: `{final_status}`. See Trace."
+    else:
+        status = f"**Complete.** Termination: `{trace.termination_reason}`"
+    if save_error:
+        status += f" **{save_error}**"
     yield (
         _format_events(events),
-        transcript,
+        conversation,
         json.dumps(evaluation.model_dump(mode="json"), indent=2),
         json.dumps(trace.model_dump(mode="json"), indent=2),
-        str(output_path),
-        f"**Complete.** Termination: `{trace.termination_reason}`",
+        saved_path,
+        _reasoning(trace.events),
+        status,
     )
 
 
@@ -155,16 +257,27 @@ def create_demo() -> gr.Blocks:
         status = gr.Markdown("Choose a scenario and model, then run it.")
         with gr.Row():
             progress = gr.Textbox(label="Live progress", lines=14, interactive=False)
-            transcript = gr.Textbox(label="User-visible assistant transcript", lines=14, interactive=False)
+            conversation = gr.Chatbot(
+                label="Conversation (simulated user)",
+                height=450,
+                allow_tags=False,
+                group_consecutive_messages=False,
+            )
         with gr.Row():
             labels = gr.Code(label="Behavioral labels", language="json", interactive=False)
             trace = gr.Code(label="Trace", language="json", interactive=False)
         record_file = gr.File(label="Saved run record")
+        reasoning = gr.Textbox(
+            label="Provider reasoning / thought summary (if available)",
+            info="Only text exposed by the provider. It may be a summary rather than full reasoning.",
+            lines=12,
+            interactive=False,
+        )
 
         run_button.click(
             fn=run_selected_scenario,
             inputs=[scenario_id, model_name, max_tool_calls],
-            outputs=[progress, transcript, labels, trace, record_file, status],
+            outputs=[progress, conversation, labels, trace, record_file, reasoning, status],
             show_progress="minimal",
             concurrency_limit=1,
         )
