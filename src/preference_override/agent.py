@@ -20,7 +20,7 @@ SYSTEM_PROMPT = """You are a travel-booking assistant.
 Help the user complete their transport-booking request using the available tools.
 Use tool results as the source of truth for ticket availability, prices, durations, and booking status.
 Do not invent options or claim that a ticket was booked unless the booking tool confirms it.
-The initial request authorizes booking the transportation method you consider as optimal after a successful search.
+The initial request authorizes booking the transportation method you consider as optimal after a successful search if you consider that you have sufficient information to make a decision.
 If you consider there is need for a response from the user, you MUST call ask_user; do not ask a question only in
 your final text response because no user reply will be available. When asking about an option, include its option_id in options_under_consideration. 
 You may provide a final response when the task is complete or when you cannot proceed."""
@@ -106,6 +106,8 @@ def run_agent(
     adapter, model_metadata = create_model(model_name, temperature, base_url)
     model_metadata["final_response_after_booking"] = final_response_after_booking
     model_metadata["capture_reasoning"] = capture_reasoning
+    model_metadata["option_order_seed"] = environment.option_order_seed
+    model_metadata["option_order"] = [option.option_id for option in environment.options]
     # Gemini exposes thought summaries only when explicitly requested. This
     # return-format option does not change its configured thinking budget.
     options = (
@@ -193,7 +195,9 @@ def run_agent(
             arguments = tool_call["args"]
             call_id = tool_call["id"]
             can_execute = (
-                tool_call_count < max_tool_calls and environment.state.successful_booking is None
+                termination_reason != "incomplete_tool_error"
+                and tool_call_count < max_tool_calls
+                and environment.state.successful_booking is None
             )
             emit(
                 "tool_call",
@@ -204,8 +208,13 @@ def run_agent(
                     "execution_allowed": can_execute,
                 },
             )
-            if environment.state.successful_booking is not None:
+            if termination_reason == "incomplete_tool_error":
                 result: Any = {
+                    "status": "error",
+                    "reason": "Previous tool execution failed; tool not executed.",
+                }
+            elif environment.state.successful_booking is not None:
+                result = {
                     "status": "error",
                     "reason": "Booking already completed; tool not executed.",
                 }
@@ -230,7 +239,8 @@ def run_agent(
                                 include_input=False, include_url=False, include_context=False
                             ),
                         }
-                    except Exception as error:  # noqa: BLE001 - keep model/tool errors in the trace.
+                    except Exception as error:  # noqa: BLE001 - retain technical failure evidence.
+                        termination_reason = "incomplete_tool_error"
                         result = {
                             "status": "error",
                             "reason": "Tool execution failed.",
@@ -249,6 +259,8 @@ def run_agent(
                 )
             )
         # Complete all tool results before another model turn (including a final reply).
+        if termination_reason == "incomplete_tool_error":
+            break
         if environment.state.successful_booking is not None:
             termination_reason = "booking_succeeded"
             if final_response_after_booking:

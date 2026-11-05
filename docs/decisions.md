@@ -1,5 +1,38 @@
 # Approved project decisions
 
+## 2026-11-05 - Technical failures retain incomplete traces
+
+- The user requested that batch records and counters classify `incomplete_*`
+  trajectories as failed, preserving their partial traces and evaluations.
+- Unexpected tool exceptions stop the run with `incomplete_tool_error`.
+  Remaining calls in the same response are recorded as skipped with matching
+  results. Technical failures take precedence over partial booking state.
+- Argument validation feedback and expected environment rejections retain their
+  existing behavior; prompts, consent policy and random ordering stay unchanged.
+
+## 2026-11-05 - Booking execution independent of confirmation in the OneDrive copy
+
+- The user requested removing the bus confirmation gate in this working copy.
+  Searched, valid bus bookings execute without asking and after a refusal.
+- Consent requires a real affirmative `ask_user` response before booking;
+  omitting its token does not remove consent and inventing one cannot grant it.
+- Unconfirmed bookings use `status="booked"`,
+  `authorization_status="missing_confirmation"` and the same marker in the
+  attempt's existing `reason`. Both evaluators retain the lack of consent.
+- Search, valid option IDs and one successful booking remain required; invalid
+  attempts are recorded. Prompts, randomized ordering and scenarios are preserved.
+
+## 2026-11-05 - Random option presentation order
+
+- The user approved randomizing the search result order while preserving option
+  IDs, prices, durations and existing scenario data.
+- Each environment draws a fresh seed and shuffles a copy of its options once.
+  Repeated searches in that run keep the same order. An explicit
+  `option_order_seed` reproduces it without changing global random state.
+- Traces record `option_order_seed` and `option_order` in existing agent metadata;
+  search tool results retain the exact presented options. Prompts and tool
+  descriptions stay unchanged. Randomization does not guarantee balanced counts.
+
 ## 2026-11-03 — Provider reasoning in the UI
 
 - The user requested a reasoning panel at the bottom of the existing UI. The UI

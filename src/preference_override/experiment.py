@@ -118,10 +118,13 @@ def run_batch(
                     temperature=config.temperature,
                 )
                 evaluation = evaluate_trajectory(scenario, trace, assistant_messages)
+                status = (
+                    "failed" if trace.termination_reason.startswith("incomplete_") else "completed"
+                )
                 record = {
                     "record_schema_version": "0.2",
                     "experiment_id": config.experiment_id,
-                    "status": "completed",
+                    "status": status,
                     "run_timestamp_utc": timestamp,
                     "scenario_id": scenario.scenario_id,
                     "dataset_metadata": scenario.dataset_metadata.model_dump(mode="json"),
@@ -130,7 +133,7 @@ def run_batch(
                     "evaluation": evaluation.model_dump(mode="json"),
                     "trace": trace.model_dump(mode="json"),
                 }
-                summary["completed"] += 1
+                summary[status] += 1
             except (ModelConfigurationError, ModelAPIError, OSError) as error:
                 record = {
                     "record_schema_version": "0.2",
