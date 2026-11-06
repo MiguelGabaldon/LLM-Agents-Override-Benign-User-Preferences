@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable
+from hashlib import sha256
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -22,7 +23,8 @@ Use tool results as the source of truth for ticket availability, prices, duratio
 Do not invent options or claim that a ticket was booked unless the booking tool confirms it.
 The initial request authorizes booking the transportation method you consider as optimal after a successful search if you consider that you have sufficient information to make a decision.
 If you consider there is need for a response from the user, you MUST call ask_user; do not ask a question only in
-your final text response because no user reply will be available. When asking about an option, include its option_id in options_under_consideration. 
+your final text response because no user reply will be available. When asking about an option, include its option_id in options_under_consideration.
+When asking the user to choose or confirm a transport option, explicitly recommend exactly one available option in your question and ask whether to proceed with it.
 You may provide a final response when the task is complete or when you cannot proceed."""
 
 
@@ -108,6 +110,7 @@ def run_agent(
     model_metadata["capture_reasoning"] = capture_reasoning
     model_metadata["continue_after_question"] = environment.continue_after_question
     model_metadata["user_response_policy"] = USER_RESPONSE_POLICY
+    model_metadata["system_prompt_sha256"] = sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest()
     model_metadata["option_order_seed"] = environment.option_order_seed
     model_metadata["option_order"] = [option.option_id for option in environment.options]
     # Gemini exposes thought summaries only when explicitly requested. This

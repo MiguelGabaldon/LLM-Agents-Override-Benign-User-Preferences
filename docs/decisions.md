@@ -1,5 +1,19 @@
 # Approved project decisions
 
+## 2026-11-05 - Explicit recommendations and conservative question scoring
+
+- The user approved requiring exactly one explicit recommendation inside a
+  transport-choice or confirmation question. This instruction does not choose
+  train or bus for the agent. New traces record the system prompt's SHA-256.
+- The UI converts literal escaped newlines into visible line breaks without
+  changing the original messages, tool arguments, environment state or trace.
+- The lexical baseline separates questions, conditional plans and negations from
+  affirmative commitments. Recommendation targets are kept distinct from other
+  options mentioned in comparisons; a neutral question stays mixed/undecided.
+- Both existing scorers share these semantic heuristics. Model noncompliance is
+  recorded as observed, without extra model calls or rewriting its answer.
+  Saved historical run files remain untouched. These heuristics are not gold.
+
 ## 2026-11-05 - Stop at questions or continue with fixed agreement
 
 - The user approved `continue_after_question`, defaulting to `false`. A valid

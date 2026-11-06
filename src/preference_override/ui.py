@@ -61,7 +61,8 @@ def _conversation(user_request: str, events: list[TraceEvent]) -> list[dict[str,
         else:
             continue
         if isinstance(content, str) and content.strip():
-            messages.append({"role": role, "content": content})
+            display_content = content.replace("\\r\\n", "\n").replace("\\n", "\n")
+            messages.append({"role": role, "content": display_content})
     return messages
 
 
