@@ -218,6 +218,7 @@ def test_ui_reports_missing_key_without_saving_run(isolated_credentials, monkeyp
         pytest.fail("A failed run must not save a successful record")
 
     monkeypatch.setattr(ui, "_output_path", unexpected_output)
+    monkeypatch.setattr(ui, "DEFAULT_SCENARIO_PATH", Path("data/scenarios/transport_pilot_v0_2.json"))
     updates = list(
         ui.run_selected_scenario(
             "F01_exploratory_modest_approve", "groq:openai/gpt-oss-120b", 6

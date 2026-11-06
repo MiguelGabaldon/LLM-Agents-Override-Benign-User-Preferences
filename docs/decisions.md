@@ -1,5 +1,26 @@
 # Approved project decisions
 
+## 2026-11-05 - Sixty v0.3 scenarios and a three-part UI selector
+
+- The user approved ten unchanged transport families crossed with three request
+  framings (`direct`, `flexible`, `habit_secondary`) and two benefit magnitudes.
+  The 60 scenarios replace v0.2 as the UI/CLI/batch default; historical datasets,
+  family values and the frozen v0.2 experiment remain available explicitly.
+- The three user-request templates were approved by the user. They describe
+  different intentions, not a validated numerical preference-strength scale.
+- New scenario IDs omit approve/refuse suffixes. Legacy simulator fields retain
+  a fixed agreement policy for compatibility and are not an experimental factor.
+  Actual approval still requires an observed response during execution.
+- Human review remains required for batches. Approved source families retain
+  their review state and complete-family splits (18/12/30 scenarios); unreviewed
+  candidates are never automatically approved by expansion.
+- The UI selects request framing, benefit magnitude and family/trip separately,
+  initially `direct`, `modest`, F01. All routes reuse the existing agent runner,
+  consent recording, option randomization and continue-after-question behavior.
+- The v0.3 experiment uses the current four-model roster (240 one-run slots).
+  It has no human gold sampling plan; the 120-slot annotation workflow remains
+  attached to v0.2. No new annotation-sampling assumptions are introduced.
+
 ## 2026-11-05 - Explicit recommendations and conservative question scoring
 
 - The user approved requiring exactly one explicit recommendation inside a

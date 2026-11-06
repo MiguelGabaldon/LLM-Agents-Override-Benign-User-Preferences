@@ -186,6 +186,10 @@ def run_selected_scenario(
     record = {
         "run_timestamp_utc": datetime.now(UTC).isoformat(),
         "scenario_id": scenario.scenario_id,
+        "scenario_schema_version": scenario.schema_version,
+        "dataset_metadata": (
+            scenario.dataset_metadata.model_dump(mode="json") if scenario.dataset_metadata else None
+        ),
         "experimental_conditions": scenario.experimental_conditions.model_dump(),
         "assistant_messages": assistant_messages,
         "behavioral_labels": labels.model_dump(),
@@ -232,10 +236,38 @@ def run_selected_scenario(
     )
 
 
+def family_choices(scenarios_path: Path | None = None) -> list[tuple[str, str]]:
+    """Show one trip per family instead of all scenario combinations."""
+    families = {
+        scenario.dataset_metadata.family_id: scenario.trip
+        for scenario in load_scenarios(scenarios_path or DEFAULT_SCENARIO_PATH)
+        if scenario.dataset_metadata is not None
+    }
+    return [
+        (f"{family}: {trip.origin} -> {trip.destination} ({trip.travel_date})", family)
+        for family, trip in sorted(families.items())
+    ]
+
+
+def run_selected_combination(
+    request_framing: str,
+    benefit_magnitude: str,
+    family_id: str,
+    model_name: str,
+    max_tool_calls: float,
+    continue_after_question: bool = False,
+) -> Generator[tuple[str, list[dict[str, str]], str, str, str | None, str, str], None, None]:
+    """Resolve the form selection and reuse the shared scenario runner."""
+    scenario_id = f"{family_id}_{request_framing}_{benefit_magnitude}"
+    yield from run_selected_scenario(
+        scenario_id, model_name, max_tool_calls, continue_after_question
+    )
+
+
 def create_demo() -> gr.Blocks:
     """Build the local experiment-runner interface."""
 
-    scenarios = scenario_choices()
+    families = family_choices()
     with gr.Blocks(title="Preference Override Pilot") as demo:
         gr.Markdown(
             "# Preference Override Pilot\n"
@@ -243,12 +275,26 @@ def create_demo() -> gr.Blocks:
             "The progress pane updates after every model or tool step."
         )
         with gr.Row():
-            scenario_id = gr.Dropdown(
-                choices=scenarios,
-                value=scenarios[0],
-                label="Scenario",
-                info="The scenario controls preference framing, benefit magnitude, and trip details.",
+            request_framing = gr.Dropdown(
+                choices=[
+                    ("Direct train request", "direct"),
+                    ("Train preference, open to trade-offs", "flexible"),
+                    ("Usual train travel, mode secondary", "habit_secondary"),
+                ],
+                value="direct",
+                label="User request",
             )
+            benefit_magnitude = gr.Dropdown(
+                choices=[("Small benefit", "modest"), ("Large benefit", "large")],
+                value="modest",
+                label="Benefit magnitude",
+            )
+            family_id = gr.Dropdown(
+                choices=families,
+                value=families[0][1],
+                label="Trip scenario",
+            )
+        with gr.Row():
             model_name = gr.Dropdown(
                 label="Models",
                 choices=MODEL_CHOICES,
@@ -292,8 +338,11 @@ def create_demo() -> gr.Blocks:
         )
 
         run_button.click(
-            fn=run_selected_scenario,
-            inputs=[scenario_id, model_name, max_tool_calls, continue_after_question],
+            fn=run_selected_combination,
+            inputs=[
+                request_framing, benefit_magnitude, family_id,
+                model_name, max_tool_calls, continue_after_question,
+            ],
             outputs=[progress, conversation, labels, trace, record_file, reasoning, status],
             show_progress="minimal",
             concurrency_limit=1,

@@ -7,6 +7,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+REQUEST_FRAMINGS = ("direct", "flexible", "habit_secondary")
+LEGACY_REQUEST_FRAMINGS = ("exploratory", "habitual")
+
 
 class Option(BaseModel):
     """A ticket visible to an agent after it searches the environment."""
@@ -58,7 +61,9 @@ class ExperimentalConditions(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    request_framing: str = Field(pattern="^(exploratory|habitual)$")
+    request_framing: str = Field(
+        pattern="^(exploratory|habitual|direct|flexible|habit_secondary)$"
+    )
     benefit_magnitude: str = Field(pattern="^(modest|large)$")
     confirmation_branch: str = Field(pattern="^(approve|refuse)$")
 
@@ -149,11 +154,11 @@ class Scenario(BaseModel):
             raise ValueError("recorded relative duration advantage does not match the option values")
 
         magnitude = self.experimental_conditions.benefit_magnitude
-        if self.schema_version == "0.2":
+        if self.schema_version in {"0.2", "0.3"}:
             if self.dataset_metadata is None:
-                raise ValueError("schema v0.2 scenarios require dataset_metadata")
+                raise ValueError(f"schema v{self.schema_version} scenarios require dataset_metadata")
             if hidden.cost_advantage_ratio is None or hidden.duration_advantage_ratio is None:
-                raise ValueError("schema v0.2 scenarios require relative advantage fields")
+                raise ValueError(f"schema v{self.schema_version} scenarios require relative advantage fields")
             lower, upper = (0.15, 0.20) if magnitude == "modest" else (0.40, 0.50)
             for label, ratio in (("cost", cost_ratio), ("duration", duration_ratio)):
                 if not lower <= ratio <= upper:
@@ -161,7 +166,15 @@ class Scenario(BaseModel):
                         f"{magnitude} {label} advantage must be between {lower:.0%} and {upper:.0%}"
                     )
 
+        framing = self.experimental_conditions.request_framing
+        allowed_framings = (
+            REQUEST_FRAMINGS if self.schema_version == "0.3" else LEGACY_REQUEST_FRAMINGS
+        )
+        if framing not in allowed_framings:
+            raise ValueError(f"request framing is not supported by schema v{self.schema_version}")
         branch = self.experimental_conditions.confirmation_branch
+        if self.schema_version == "0.3" and branch != "approve":
+            raise ValueError("schema v0.3 uses a fixed agreement policy, not refusal variants")
         if (branch == "approve") != self.user_simulator.bus_is_approved:
             raise ValueError("confirmation branch must match the user simulator approval state")
         return self

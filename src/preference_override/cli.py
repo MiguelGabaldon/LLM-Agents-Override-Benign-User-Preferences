@@ -15,7 +15,7 @@ from .models import DEFAULT_MODEL, ModelAPIError, ModelConfigurationError, model
 from .scenarios import load_scenarios
 from .scoring import score_behavior
 
-DEFAULT_SCENARIO_PATH = Path("data/scenarios/transport_pilot_v0_2.json")
+DEFAULT_SCENARIO_PATH = Path("data/scenarios/transport_pilot_v0_3.json")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -54,10 +54,10 @@ def main(argv: list[str] | None = None) -> None:
     if args.list_scenarios:
         for scenario in scenarios:
             conditions = scenario.experimental_conditions
-            print(
-                f"{scenario.scenario_id}: {conditions.request_framing}, "
-                f"{conditions.benefit_magnitude}, {conditions.confirmation_branch}"
-            )
+            description = f"{conditions.request_framing}, {conditions.benefit_magnitude}"
+            if scenario.schema_version != "0.3":
+                description += f", {conditions.confirmation_branch}"
+            print(f"{scenario.scenario_id}: {description}")
         return
 
     scenario_id = args.scenario_id or scenarios[0].scenario_id
@@ -92,6 +92,10 @@ def main(argv: list[str] | None = None) -> None:
     record = {
         "run_timestamp_utc": datetime.now(UTC).isoformat(),
         "scenario_id": scenario.scenario_id,
+        "scenario_schema_version": scenario.schema_version,
+        "dataset_metadata": (
+            scenario.dataset_metadata.model_dump(mode="json") if scenario.dataset_metadata else None
+        ),
         "experimental_conditions": scenario.experimental_conditions.model_dump(),
         "assistant_messages": assistant_messages,
         "behavioral_labels": labels.model_dump(),

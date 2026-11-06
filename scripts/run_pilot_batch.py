@@ -1,4 +1,4 @@
-"""Execute the frozen 80-scenario pilot roster (external calls require --execute)."""
+"""Execute the configured scenario roster (external calls require --execute)."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from preference_override.experiment import (
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=Path("experiments/pilot_v0_2.json"))
-    parser.add_argument("--output-root", type=Path, default=Path("runs/pilot_v0_2"))
+    parser.add_argument("--config", type=Path, default=Path("experiments/pilot_v0_3.json"))
+    parser.add_argument("--output-root", type=Path, default=Path("runs/pilot_v0_3"))
     parser.add_argument("--model", action="append", dest="models")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument(

@@ -20,6 +20,8 @@ def main() -> None:
     )
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
+    if not config.get("human_gold"):
+        raise ValueError("this experiment has no human gold sampling plan; use the v0.2 configuration")
     scenarios = load_scenarios(Path(config["scenario_path"]))
     manifest = build_gold_sample_template(scenarios, config["evaluated_models"])
     write_manifest(args.output, manifest)

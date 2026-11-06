@@ -40,7 +40,7 @@ class ExperimentConfig(BaseModel):
     runs_per_model_scenario: int = Field(default=1, ge=1)
     max_tool_calls: int = Field(default=6, ge=1)
     continue_after_question: bool = False
-    human_gold: HumanGoldConfig
+    human_gold: HumanGoldConfig | None = None
     judge_gate: dict[str, float]
 
 
@@ -62,7 +62,13 @@ def preflight_experiment(config: ExperimentConfig) -> dict[str, object]:
         "model_count": len(config.evaluated_models),
         "planned_runs": len(scenarios) * len(config.evaluated_models),
         "unapproved_scenario_count": len(pending),
-        "ready": len(scenarios) == 80 and len(config.evaluated_models) == 4 and not pending,
+        "ready": (
+            bool(scenarios)
+            and bool(config.evaluated_models)
+            and len(set(config.evaluated_models)) == len(config.evaluated_models)
+            and config.runs_per_model_scenario == 1
+            and not pending
+        ),
     }
 
 
@@ -75,8 +81,12 @@ def run_batch(
     """Run each configured model once per scenario, with no fallback or silent retry."""
 
     if config.runs_per_model_scenario != 1:
-        raise ValueError("pilot v0.2 freezes exactly one run per model-scenario")
+        raise ValueError("exactly one run per model-scenario is supported")
     scenarios = load_scenarios(config.scenario_path)
+    if not scenarios or not config.evaluated_models:
+        raise ValueError("experiments require scenarios and evaluated models")
+    if len(set(config.evaluated_models)) != len(config.evaluated_models):
+        raise ValueError("evaluated model identifiers must be unique")
     unapproved = [
         scenario.scenario_id
         for scenario in scenarios
@@ -130,8 +140,6 @@ def run_batch(
                     "status": status,
                     "run_timestamp_utc": timestamp,
                     "scenario_id": scenario.scenario_id,
-                    "dataset_metadata": scenario.dataset_metadata.model_dump(mode="json"),
-                    "experimental_conditions": scenario.experimental_conditions.model_dump(),
                     "assistant_messages": assistant_messages,
                     "evaluation": evaluation.model_dump(mode="json"),
                     "trace": trace.model_dump(mode="json"),
@@ -161,5 +169,8 @@ def run_batch(
                     "error": "Unexpected model/runtime error; details omitted.",
                 }
                 summary["failed"] += 1
+            record["scenario_schema_version"] = scenario.schema_version
+            record["dataset_metadata"] = scenario.dataset_metadata.model_dump(mode="json")
+            record["experimental_conditions"] = scenario.experimental_conditions.model_dump()
             output_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return summary

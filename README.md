@@ -26,8 +26,10 @@ Then install the dependencies and the project:
 .\.venv\Scripts\python.exe -m ruff check .
 ```
 
-The scenario fixtures live in `data/scenarios/transport_pilot_v0.json`. They
-are synthetic and do not represent real transport schedules or prices.
+The default scenarios live in `data/scenarios/transport_pilot_v0_3.json`: ten
+families, three request framings and two benefit magnitudes produce 60 scenarios.
+They are synthetic and do not represent real transport schedules or prices.
+The historical v0 and v0.2 fixtures remain available with `--scenarios-path`.
 
 `src/preference_override/agent.py` runs the shared tool loop;
 `src/preference_override/models.py` configures the local and API adapters.
@@ -156,13 +158,13 @@ with your own configured credentials.
 ## Run one pilot scenario
 
 ```powershell
-.\.venv\Scripts\run-transport-pilot.exe --scenario-id T01_approve
+.\.venv\Scripts\run-transport-pilot.exe --scenario-id F01_direct_modest
 ```
 
 To run through the API instead:
 
 ```powershell
-.\.venv\Scripts\run-transport-pilot.exe --scenario-id T01_approve --model groq:openai/gpt-oss-120b
+.\.venv\Scripts\run-transport-pilot.exe --scenario-id F01_direct_modest --model groq:openai/gpt-oss-120b
 ```
 
 Use `--model groq:openai/gpt-oss-20b` for the smaller API model, or
@@ -172,7 +174,7 @@ The command prints live model/tool trajectory steps, then behavioral labels, and
 saves the complete trace to `runs/`. Model reasoning is excluded from the
 user-visible transcript and from text-based behavioral labels. An empty final
 model response or a tool-call limit is recorded as an incomplete agent failure,
-not as a preference decision. Use `--list-scenarios` to view the eight
+not as a preference decision. Use `--list-scenarios` to view the 60
 available scenario IDs.
 
 ## Run the local experiment interface
@@ -183,7 +185,11 @@ Launch the local-only browser interface from the project directory:
 .\.venv\Scripts\run-transport-pilot-ui.exe
 ```
 
-Choose a scenario and an option under **Models**, then select **Run scenario**.
+Choose **User request**, **Benefit magnitude** (small or large), and
+**Trip scenario** (F01-F10 with route and date), then choose a model and run it.
+The initial selection is a direct train request, small benefit and F01.
+The three request types are a direct train booking, a train preference that also
+values cost and time, and usual train travel with mode as a secondary priority.
 By default, the run stops at the first `ask_user` question and saves it without a
 user reply or booking. Enable **Continue after asking the user** to reply
 "Okay, that sounds good to me." and continue. This reply is the same for all
@@ -198,3 +204,32 @@ failure. No simulated agreement or consent is recorded in that mode.
 You can still enter a custom installed Ollama model name in the selector. The
 interface shows step-level model/tool progress, the user-visible transcript,
 behavioral labels, the complete trace, and a download link for the saved record.
+
+
+## Generate scenarios and run batches
+
+Regenerate the 60 v0.3 scenarios from the approved family values:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/generate_transport_dataset.py
+```
+
+Use `--schema-version 0.2 --output <path>` to explicitly regenerate the historical
+80-scenario dataset. v0.3 IDs look like `F01_direct_modest`,
+`F01_flexible_large` or `F10_habit_secondary_large`, without response suffixes.
+The legacy simulator fields contain a fixed agreement policy; they do not mean
+that approval has occurred before the agent asks and receives a reply.
+
+Check the current four-model batch configuration without model calls:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_pilot_batch.py
+```
+
+It reports 60 scenarios and 240 planned runs. Add `--execute` to perform calls,
+optionally `--model <configured-model-id>` to restrict the roster, and `--resume`
+to skip existing records. The default output is `runs/pilot_v0_3`.
+Human approval remains required; expansion preserves each family's review status.
+Pass `--config experiments/pilot_v0_2.json --output-root runs/pilot_v0_2` to run
+the historical experiment explicitly. Its annotation workflow is unchanged;
+v0.3 does not define a human gold sampling plan.

@@ -21,6 +21,12 @@ from preference_override.scoring import score_behavior
 SCENARIO_PATH = Path("data/scenarios/transport_pilot_v0_2.json")
 
 
+@pytest.fixture(autouse=True)
+def legacy_ui_dataset(monkeypatch):
+    """Keep these historical regressions explicitly attached to their v0.2 fixture."""
+    monkeypatch.setattr(ui_module, "DEFAULT_SCENARIO_PATH", SCENARIO_PATH)
+
+
 @pytest.fixture
 def scenarios() -> list[Scenario]:
     return load_scenarios(SCENARIO_PATH)
@@ -1099,7 +1105,10 @@ def test_question_switch_reaches_cli_and_batch_records(
     model = scripted_model(monkeypatch, responses)
     if entrypoint == "cli":
         path = tmp_path / "cli.json"
-        args = ["--scenario-id", scenario.scenario_id, "--model", "test", "--output", str(path)]
+        args = [
+            "--scenarios-path", str(SCENARIO_PATH), "--scenario-id", scenario.scenario_id,
+            "--model", "test", "--output", str(path),
+        ]
         if continue_after_question:
             args.append("--continue-after-question")
         cli.main(args)

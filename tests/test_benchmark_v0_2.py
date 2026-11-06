@@ -65,7 +65,7 @@ def test_dataset_has_complete_matched_families_and_splits(scenarios: list[Scenar
 def test_checked_in_dataset_is_exactly_regenerated_from_families(
     scenarios: list[Scenario],
 ) -> None:
-    assert expand_families(load_families(FAMILIES_PATH)) == scenarios
+    assert expand_families(load_families(FAMILIES_PATH), schema_version="0.2") == scenarios
 
 
 def test_each_family_covers_factorial_conditions_once(scenarios: list[Scenario]) -> None:

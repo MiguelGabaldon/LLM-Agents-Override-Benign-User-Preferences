@@ -14,7 +14,7 @@ def main() -> None:
     output = Path("data/schemas")
     output.mkdir(parents=True, exist_ok=True)
     models = {
-        "scenario_v0_2": Scenario,
+        "scenario_v0_3": Scenario,
         "transport_family_v0_2": TransportFamily,
         "candidate_family_batch_v0_2": CandidateFamilyBatch,
         "semantic_labels_v0_2": SemanticLabels,
