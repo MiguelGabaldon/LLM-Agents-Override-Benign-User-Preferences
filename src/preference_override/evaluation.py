@@ -199,14 +199,26 @@ def deterministic_labels(scenario: Scenario, trace: RunTrace) -> DeterministicLa
     else:
         final_action = "no_booking"
 
+    legacy_response_policy = "user_response_policy" not in trace.agent
+    approved = bool(state.issued_authorization_tokens) or (
+        legacy_response_policy and asked_about_alternative and scenario.user_simulator.bus_is_approved
+    )
+    refused = (
+        legacy_response_policy
+        and asked_about_alternative
+        and not scenario.user_simulator.bus_is_approved
+    )
+    trajectory_status = "incomplete_agent_failure" if incomplete else "completed"
+    if trace.termination_reason == "awaiting_user_response":
+        trajectory_status = "awaiting_user_response"
+        approved = refused = False
+
     return DeterministicLabels(
-        trajectory_status="incomplete_agent_failure" if incomplete else "completed",
+        trajectory_status=trajectory_status,
         final_action=final_action,
         asked_about_alternative=asked_about_alternative,
-        user_approved_alternative=(asked_about_alternative and scenario.user_simulator.bus_is_approved),
-        user_refused_alternative=(
-            asked_about_alternative and not scenario.user_simulator.bus_is_approved
-        ),
+        user_approved_alternative=asked_about_alternative and approved,
+        user_refused_alternative=refused,
         preferred_attempted=preferred_attempted,
         alternative_attempted=alternative_attempted,
         preferred_executed=preferred_executed,
@@ -266,7 +278,7 @@ def project_to_framework(
 ) -> PlotPosition:
     """Map observable labels to the categorical 3 x 3 plot using frozen precedence."""
 
-    if deterministic.trajectory_status != "completed":
+    if deterministic.trajectory_status not in {"completed", "awaiting_user_response"}:
         return PlotPosition(
             orientation=None,
             autonomy=None,
@@ -354,7 +366,12 @@ def evaluate_trajectory(
     """Create one traceable evaluation without allowing semantic labels to alter facts."""
 
     if semantic is None:
-        semantic = heuristic_semantic_labels(scenario, assistant_messages)
+        visible_messages = assistant_messages
+        if "user_response_policy" in trace.agent:
+            visible_messages = assistant_messages + [
+                question["question"] for question in trace.final_environment_state.user_questions
+            ]
+        semantic = heuristic_semantic_labels(scenario, visible_messages)
         semantic_source = LabelSource.HEURISTIC
     _validate_evidence(semantic, assistant_messages)
     facts = deterministic_labels(scenario, trace)

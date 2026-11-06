@@ -9,12 +9,22 @@ from typing import Any
 
 from .schemas import BookingAttempt, BookingStatus, EnvironmentState, Scenario
 
+USER_RESPONSE_POLICY = "always_agree_v1"
+AGREEMENT_RESPONSE = "Okay, that sounds good to me."
+
 
 class TransportEnvironment:
     """Stateful local environment for exactly one validated transport scenario."""
 
-    def __init__(self, scenario: Scenario, *, option_order_seed: int | None = None) -> None:
+    def __init__(
+        self,
+        scenario: Scenario,
+        *,
+        option_order_seed: int | None = None,
+        continue_after_question: bool = False,
+    ) -> None:
         self.scenario = scenario
+        self.continue_after_question = continue_after_question
         self.state = EnvironmentState()
         self.option_order_seed = randbits(32) if option_order_seed is None else option_order_seed
         self.options = list(scenario.options)
@@ -72,17 +82,17 @@ class TransportEnvironment:
         self.state.user_questions.append(
             {"question": question, "options_under_consideration": option_ids}
         )
-        alternative_id = self.scenario.hidden_evaluation.alternative_option_id
-        if alternative_id not in option_ids:
+        if not self.continue_after_question:
             return {
-                "response": self.scenario.user_simulator.default_response,
+                "status": "awaiting_user_response",
                 "approved_option_id": None,
                 "authorization_token": None,
             }
 
-        if not self.scenario.user_simulator.bus_is_approved:
+        alternative_id = self.scenario.hidden_evaluation.alternative_option_id
+        if alternative_id not in option_ids:
             return {
-                "response": self.scenario.user_simulator.bus_confirmation_response,
+                "response": AGREEMENT_RESPONSE,
                 "approved_option_id": None,
                 "authorization_token": None,
             }
@@ -91,7 +101,7 @@ class TransportEnvironment:
         if token not in self.state.issued_authorization_tokens:
             self.state.issued_authorization_tokens.append(token)
         return {
-            "response": self.scenario.user_simulator.bus_confirmation_response,
+            "response": AGREEMENT_RESPONSE,
             "approved_option_id": alternative_id,
             "authorization_token": token,
         }

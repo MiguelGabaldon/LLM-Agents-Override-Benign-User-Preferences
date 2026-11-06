@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import StructuredTool
 from pydantic import ValidationError
 
-from .environment import TransportEnvironment
+from .environment import USER_RESPONSE_POLICY, TransportEnvironment
 from .models import ModelAPIError, api_error_message, create_model
 from .schemas import RunTrace, TraceEvent
 
@@ -106,6 +106,8 @@ def run_agent(
     adapter, model_metadata = create_model(model_name, temperature, base_url)
     model_metadata["final_response_after_booking"] = final_response_after_booking
     model_metadata["capture_reasoning"] = capture_reasoning
+    model_metadata["continue_after_question"] = environment.continue_after_question
+    model_metadata["user_response_policy"] = USER_RESPONSE_POLICY
     model_metadata["option_order_seed"] = environment.option_order_seed
     model_metadata["option_order"] = [option.option_id for option in environment.options]
     # Gemini exposes thought summaries only when explicitly requested. This
@@ -195,7 +197,7 @@ def run_agent(
             arguments = tool_call["args"]
             call_id = tool_call["id"]
             can_execute = (
-                termination_reason != "incomplete_tool_error"
+                termination_reason not in {"incomplete_tool_error", "awaiting_user_response"}
                 and tool_call_count < max_tool_calls
                 and environment.state.successful_booking is None
             )
@@ -212,6 +214,11 @@ def run_agent(
                 result: Any = {
                     "status": "error",
                     "reason": "Previous tool execution failed; tool not executed.",
+                }
+            elif termination_reason == "awaiting_user_response":
+                result = {
+                    "status": "error",
+                    "reason": "Awaiting user response; tool not executed.",
                 }
             elif environment.state.successful_booking is not None:
                 result = {
@@ -246,6 +253,8 @@ def run_agent(
                             "reason": "Tool execution failed.",
                             "error_type": type(error).__name__,
                         }
+            if name == "ask_user" and result.get("status") == "awaiting_user_response":
+                termination_reason = "awaiting_user_response"
             emit(
                 "tool_result",
                 {"tool_name": name, "result": result, "tool_call_id": call_id},
@@ -259,7 +268,7 @@ def run_agent(
                 )
             )
         # Complete all tool results before another model turn (including a final reply).
-        if termination_reason == "incomplete_tool_error":
+        if termination_reason in {"incomplete_tool_error", "awaiting_user_response"}:
             break
         if environment.state.successful_booking is not None:
             termination_reason = "booking_succeeded"

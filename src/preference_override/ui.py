@@ -15,7 +15,7 @@ import gradio as gr
 
 from .agent import run_agent
 from .cli import DEFAULT_SCENARIO_PATH
-from .environment import TransportEnvironment
+from .environment import USER_RESPONSE_POLICY, TransportEnvironment
 from .evaluation import evaluate_trajectory
 from .models import (
     DEFAULT_MODEL,
@@ -77,7 +77,10 @@ def _reasoning(events: list[TraceEvent]) -> str:
 
 
 def run_selected_scenario(
-    scenario_id: str, model_name: str, max_tool_calls: float
+    scenario_id: str,
+    model_name: str,
+    max_tool_calls: float,
+    continue_after_question: bool = False,
 ) -> Generator[tuple[str, list[dict[str, str]], str, str, str | None, str, str], None, None]:
     """Run in a worker thread and yield step-level updates to the interface."""
 
@@ -89,7 +92,7 @@ def run_selected_scenario(
 
     progress_queue: Queue[str | TraceEvent] = Queue()
     result: dict[str, Any] = {}
-    environment = TransportEnvironment(scenario)
+    environment = TransportEnvironment(scenario, continue_after_question=continue_after_question)
     run_id = f"{scenario.scenario_id}_{uuid4().hex[:8]}"
 
     def execute() -> None:
@@ -152,7 +155,13 @@ def run_selected_scenario(
         result["trace"] = RunTrace(
             run_id=run_id,
             scenario_id=scenario.scenario_id,
-            agent={"provider": provider, "model_name": name, "configuration_incomplete": True},
+            agent={
+                "provider": provider,
+                "model_name": name,
+                "configuration_incomplete": True,
+                "continue_after_question": continue_after_question,
+                "user_response_policy": USER_RESPONSE_POLICY,
+            },
             events=received_events,
             final_environment_state=environment.state,
             termination_reason="incomplete_runtime_error",
@@ -203,6 +212,8 @@ def run_selected_scenario(
         status = f"**Run failed:** {result['error']}. Partial trace retained."
     elif trace.termination_reason.startswith("incomplete_"):
         status = f"**Incomplete.** Termination: `{trace.termination_reason}`"
+    elif trace.termination_reason == "awaiting_user_response":
+        status = "**Awaiting user response.** Question saved; no simulated reply was sent."
     elif final_status in {"empty", "failed", "invalid_tool_call"}:
         status = f"**Booking completed.** Final response: `{final_status}`. See Trace."
     else:
@@ -235,7 +246,7 @@ def create_demo() -> gr.Blocks:
                 choices=scenarios,
                 value=scenarios[0],
                 label="Scenario",
-                info="The scenario controls preference framing, benefit magnitude, and response branch.",
+                info="The scenario controls preference framing, benefit magnitude, and trip details.",
             )
             model_name = gr.Dropdown(
                 label="Models",
@@ -253,6 +264,11 @@ def create_demo() -> gr.Blocks:
                 step=1,
                 label="Maximum tool calls",
             )
+        continue_after_question = gr.Checkbox(
+            value=False,
+            label="Continue after asking the user",
+            info='Off: stop at the first question. On: reply "Okay, that sounds good to me." and continue.',
+        )
         run_button = gr.Button("Run scenario", variant="primary")
         status = gr.Markdown("Choose a scenario and model, then run it.")
         with gr.Row():
@@ -276,7 +292,7 @@ def create_demo() -> gr.Blocks:
 
         run_button.click(
             fn=run_selected_scenario,
-            inputs=[scenario_id, model_name, max_tool_calls],
+            inputs=[scenario_id, model_name, max_tool_calls, continue_after_question],
             outputs=[progress, conversation, labels, trace, record_file, reasoning, status],
             show_progress="minimal",
             concurrency_limit=1,

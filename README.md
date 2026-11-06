@@ -184,6 +184,17 @@ Launch the local-only browser interface from the project directory:
 ```
 
 Choose a scenario and an option under **Models**, then select **Run scenario**.
+By default, the run stops at the first `ask_user` question and saves it without a
+user reply or booking. Enable **Continue after asking the user** to reply
+"Okay, that sounds good to me." and continue. This reply is the same for all
+scenarios, including those with legacy `approve`/`refuse` IDs. Direct bookings
+can complete in either mode. Prices, durations and option randomization are unchanged.
+
+For the CLI, add `--continue-after-question` to enable continuation. Batch configs
+accept `"continue_after_question": true` (default: `false`). The switch and reply
+policy are saved in trace metadata. An intentional stop uses
+`termination_reason="awaiting_user_response"` and does not count as a technical
+failure. No simulated agreement or consent is recorded in that mode.
 You can still enter a custom installed Ollama model name in the selector. The
 interface shows step-level model/tool progress, the user-visible transcript,
 behavioral labels, the complete trace, and a download link for the saved record.

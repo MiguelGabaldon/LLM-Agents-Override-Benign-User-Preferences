@@ -1,5 +1,24 @@
 # Approved project decisions
 
+## 2026-11-05 - Stop at questions or continue with fixed agreement
+
+- The user approved `continue_after_question`, defaulting to `false`. A valid
+  `ask_user` call records the question and stops at `awaiting_user_response`
+  without a simulated reply or authorization. Later calls in that same model
+  response are recorded as skipped; direct bookings remain possible.
+- With `true`, every scenario replies "Okay, that sounds good to me." and the
+  agent continues. Alternative option IDs ground approval as before; general
+  questions do not grant alternative-booking authorization.
+- UI, CLI and batch configuration expose the same switch. Trace metadata records
+  the switch and `user_response_policy="always_agree_v1"`; new evaluations use
+  observed approval rather than the legacy scenario's approve/refuse label.
+- Waiting for a reply is an intentional observation endpoint, not a technical
+  failure or a completed booking. Batch completed counts include these successful
+  observations; termination reason and evaluation status identify the endpoint.
+- Existing scenario files and prices/durations remain unchanged. Their historical
+  response branches are ignored under this policy. Old records retain their
+  previous evaluation. The master prompt and tool descriptions are unchanged.
+
 ## 2026-11-05 - Technical failures retain incomplete traces
 
 - The user requested that batch records and counters classify `incomplete_*`

@@ -39,6 +39,7 @@ class ExperimentConfig(BaseModel):
     temperature: float = 0
     runs_per_model_scenario: int = Field(default=1, ge=1)
     max_tool_calls: int = Field(default=6, ge=1)
+    continue_after_question: bool = False
     human_gold: HumanGoldConfig
     judge_gate: dict[str, float]
 
@@ -109,7 +110,9 @@ def run_batch(
             output_path.parent.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now(UTC).isoformat()
             try:
-                environment = TransportEnvironment(scenario)
+                environment = TransportEnvironment(
+                    scenario, continue_after_question=config.continue_after_question
+                )
                 trace, assistant_messages = run_agent(
                     environment=environment,
                     run_id=f"{scenario.scenario_id}_{uuid4().hex[:8]}",

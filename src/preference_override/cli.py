@@ -36,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ollama name or provider:model (groq, google, openrouter). See README for model IDs.",
     )
     parser.add_argument("--max-tool-calls", type=int, default=6, help="Maximum tool calls.")
+    parser.add_argument(
+        "--continue-after-question",
+        action="store_true",
+        help="Reply with a fixed agreement and continue; otherwise stop at the first question.",
+    )
     parser.add_argument("--output", type=Path, help="Optional trace output path.")
     parser.add_argument(
         "--list-scenarios", action="store_true", help="List available scenario IDs and exit."
@@ -62,7 +67,7 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(f"Unknown scenario ID '{scenario_id}'. Available: {available}")
 
     run_id = f"{scenario.scenario_id}_{uuid4().hex[:8]}"
-    environment = TransportEnvironment(scenario)
+    environment = TransportEnvironment(scenario, continue_after_question=args.continue_after_question)
     try:
         trace, assistant_messages = run_agent(
             environment=environment,
