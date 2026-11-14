@@ -159,7 +159,6 @@ def test_groq_tool_round_trip_and_safe_trace(mock_groq, selection):
     assert requests[0]["max_tokens"] == 4096
     assert {tool["function"]["name"] for tool in requests[0]["tools"]} == {
         "search_transport_options",
-        "ask_user",
         "book_transport_option",
     }
     assert requests[1]["messages"][-1]["role"] == "tool"
