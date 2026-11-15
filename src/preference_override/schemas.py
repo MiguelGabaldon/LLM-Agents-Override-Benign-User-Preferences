@@ -29,16 +29,6 @@ class Trip(BaseModel):
     travel_date: str = Field(min_length=1)
 
 
-class UserSimulator(BaseModel):
-    """Deterministic response policy; never included in the initial agent prompt."""
-
-    model_config = ConfigDict(frozen=True)
-
-    default_response: str = Field(min_length=1)
-    bus_confirmation_response: str = Field(min_length=1)
-    bus_is_approved: bool
-
-
 class HiddenEvaluation(BaseModel):
     """Gold metadata that must never be sent to an evaluated agent."""
 
@@ -58,10 +48,7 @@ class ExperimentalConditions(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    request_framing: str | None = Field(default=None, pattern="^(exploratory|habitual)$")
     benefit_magnitude: str = Field(pattern="^(modest|large)$")
-    # Obsolete since the single-turn agent has no ask_user tool (schema 0.3 omits it).
-    confirmation_branch: str | None = Field(default=None, pattern="^(approve|refuse)$")
     # Schema 0.3: which prompts.txt wording was used and its preference-strength label.
     template_id: str | None = Field(default=None, pattern=r"^T\d{2}$")
     preference_strength: str | None = Field(default=None, pattern="^(weak|moderate|strong)$")
@@ -106,7 +93,6 @@ class Scenario(BaseModel):
     trip: Trip
     options: tuple[Option, Option]
     experimental_conditions: ExperimentalConditions
-    user_simulator: UserSimulator | None = None
     hidden_evaluation: HiddenEvaluation
     dataset_metadata: ScenarioMetadata | None = None
 
@@ -165,11 +151,6 @@ class Scenario(BaseModel):
                         f"{magnitude} {label} advantage must be between {lower:.0%} and {upper:.0%}"
                     )
 
-        branch = self.experimental_conditions.confirmation_branch
-        if (branch is None) != (self.user_simulator is None):
-            raise ValueError("confirmation_branch and user_simulator must be given together")
-        if branch is not None and (branch == "approve") != self.user_simulator.bus_is_approved:
-            raise ValueError("confirmation branch must match the user simulator approval state")
         return self
 
     def agent_initial_context(self) -> dict[str, Any]:
@@ -188,15 +169,12 @@ class BookingStatus(StrEnum):
 
 class BookingAttempt(BaseModel):
     option_id: str
-    authorization_token_present: bool
     status: BookingStatus
     reason: str | None = None
 
 
 class EnvironmentState(BaseModel):
     search_performed: bool = False
-    user_questions: list[dict[str, Any]] = Field(default_factory=list)
-    issued_authorization_tokens: list[str] = Field(default_factory=list)
     booking_attempts: list[BookingAttempt] = Field(default_factory=list)
     successful_booking: str | None = None
 

@@ -36,7 +36,6 @@ def test_requests_are_rendered_and_hide_the_conditions():
         assert "[" not in task.user_request
         visible = json.dumps(task.agent_initial_context()).lower()
         assert "modest" not in visible and "large" not in visible
-        assert task.experimental_conditions.confirmation_branch is None
 
 
 def test_search_results_do_not_reveal_the_conditions():

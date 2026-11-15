@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import httpx
 import langchain_groq
 import pytest
 
-from preference_override import models, ui
+from preference_override import models
 from preference_override.agent import run_agent
-from preference_override.cli import main
 from preference_override.environment import TransportEnvironment
+from preference_override.pilot import TASKS_PATH
 from preference_override.scenarios import load_scenarios
+
+
+def f01_task():
+    """First Urbana -> Chicago task (family F01, options train_001 / bus_001)."""
+    return next(t for t in load_scenarios(TASKS_PATH) if t.dataset_metadata.family_id == "F01")
 
 
 @pytest.fixture
@@ -133,14 +137,14 @@ def test_groq_tool_round_trip_and_safe_trace(mock_groq, selection):
                 {
                     "origin": "Urbana",
                     "destination": "Chicago",
-                    "travel_date": "2026-11-15",
+                    "travel_date": "2027-02-08",
                 },
                 "search-1",
             ),
             tool_response("book_transport_option", {"option_id": "train_001"}, "book-1"),
         ]
     )
-    scenario = load_scenarios(Path("data/scenarios/transport_pilot_v0.json"))[0]
+    scenario = f01_task()
     trace, visible = run_agent(TransportEnvironment(scenario), "test-api", model_name=selection)
     assert trace.termination_reason == "booking_succeeded"
     assert trace.final_environment_state.successful_booking == "train_001"
@@ -171,77 +175,9 @@ def test_groq_tool_round_trip_and_safe_trace(mock_groq, selection):
 def test_api_errors_are_safe_and_do_not_retry(mock_groq, status, expected):
     requests, responses = mock_groq
     responses.append(httpx.Response(status, json={"error": {"message": "test-secret"}}))
-    scenario = load_scenarios(Path("data/scenarios/transport_pilot_v0.json"))[0]
+    scenario = f01_task()
     with pytest.raises(models.ModelAPIError, match=expected) as caught:
         run_agent(TransportEnvironment(scenario), "test-error", "groq:openai/gpt-oss-120b")
     assert "test-secret" not in str(caught.value)
     assert len(requests) == 1
 
-
-def test_cli_writes_api_record_with_safe_filename(mock_groq, monkeypatch, tmp_path):
-    _, responses = mock_groq
-    responses.append(
-        httpx.Response(
-            200,
-            json={
-                "id": "test",
-                "object": "chat.completion",
-                "created": 0,
-                "model": "openai/gpt-oss-120b",
-                "choices": [
-                    {
-                        "index": 0,
-                        "finish_reason": "stop",
-                        "message": {
-                            "role": "assistant",
-                            "content": "No booking was made.",
-                        },
-                    }
-                ],
-            },
-        )
-    )
-    scenarios_path = Path("data/scenarios/transport_pilot_v0.json").resolve()
-    monkeypatch.chdir(tmp_path)
-    main(["--scenarios-path", str(scenarios_path), "--model", "groq:openai/gpt-oss-120b"])
-    files = list((tmp_path / "runs").glob("*.json"))
-    assert len(files) == 1
-    record = json.loads(files[0].read_text(encoding="utf-8"))
-    assert record["trace"]["agent"]["provider"] == "groq"
-    assert record["assistant_messages"] == ["No booking was made."]
-    assert "test-secret" not in files[0].read_text(encoding="utf-8")
-
-
-def test_ui_reports_missing_key_without_saving_run(isolated_credentials, monkeypatch):
-    def unexpected_output(*_):
-        pytest.fail("A failed run must not save a successful record")
-
-    monkeypatch.setattr(ui, "_output_path", unexpected_output)
-    updates = list(
-        ui.run_selected_scenario(
-            "F01_exploratory_modest_approve", "groq:openai/gpt-oss-120b", 6
-        )
-    )
-    assert "Missing GROQ_API_KEY" in updates[-1][-1]
-    assert updates[-1][4] is None
-
-
-def test_ui_model_selector_and_api_output_path():
-    demo = ui.create_demo()
-    selector = next(c for c in demo.config["components"] if c["props"].get("label") == "Models")
-    choices = {value for _, value in selector["props"]["choices"]}
-    assert choices == {
-        "qwen3:4b",
-        "groq:openai/gpt-oss-120b",
-        "groq:openai/gpt-oss-20b",
-        "groq:qwen/qwen3.8-27b",
-        "google:gemini-3.5-flash-lite",
-        "google:gemini-3.1-flash-lite",
-        "openrouter:nvidia/nemotron-3.5-lightning:free",
-        "openrouter:cohere/north-mini-code:free",
-    }
-    assert selector["props"]["value"] == "qwen3:4b"
-    assert selector["props"]["allow_custom_value"] is True
-    path = ui._output_path("T01_approve", "groq:openai/gpt-oss-120b")
-    assert path.parent == Path("runs")
-    assert ":" not in path.name

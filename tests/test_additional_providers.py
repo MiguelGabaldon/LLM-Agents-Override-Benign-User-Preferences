@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import httpx
 import langchain_groq
@@ -10,12 +9,18 @@ import pytest
 from preference_override import models
 from preference_override.agent import run_agent
 from preference_override.environment import TransportEnvironment
+from preference_override.pilot import TASKS_PATH
 from preference_override.scenarios import load_scenarios
 
 SELECTIONS = [
     *(f"google:{name}" for name in models.GOOGLE_MODELS),
     *(f"openrouter:{name}" for name in models.OPENROUTER_MODELS),
 ]
+
+
+def f01_task():
+    """First Urbana -> Chicago task (family F01, options train_001 / bus_001)."""
+    return next(t for t in load_scenarios(TASKS_PATH) if t.dataset_metadata.family_id == "F01")
 
 
 @pytest.fixture
@@ -59,7 +64,7 @@ def test_native_and_compatible_tool_round_trips(
         requests.append(payload)
         if len(requests) == 1:
             tool_name = "search_transport_options"
-            arguments = {"origin": "Urbana", "destination": "Chicago", "travel_date": "2026-11-15"}
+            arguments = {"origin": "Urbana", "destination": "Chicago", "travel_date": "2027-02-08"}
         else:
             tool_name = "book_transport_option"
             arguments = {"option_id": "train_001"}
@@ -156,7 +161,7 @@ def test_native_and_compatible_tool_round_trips(
             return adapter, metadata
 
         monkeypatch.setattr("preference_override.agent.create_model", create_intercepted)
-        scenario = load_scenarios(Path("data/scenarios/transport_pilot_v0.json"))[0]
+        scenario = f01_task()
         trace, visible = run_agent(
             TransportEnvironment(scenario),
             "test-api",
@@ -305,7 +310,7 @@ def test_new_credential_names_reload_and_environment_override(credentials, monke
     "selection", ["qwen3:4b", *(f"groq:{name}" for name in models.GROQ_MODELS)]
 )
 def test_final_text_round_trip_preserves_tool_history(monkeypatch, selection):
-    scenario = load_scenarios(Path("data/scenarios/transport_pilot_v0_2.json"))[0]
+    scenario = f01_task()
     requests = []
 
     def handle(request):

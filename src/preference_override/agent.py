@@ -12,9 +12,8 @@ from langchain_core.tools import StructuredTool
 from pydantic import ValidationError
 
 from .environment import TransportEnvironment
-from .models import ModelAPIError, api_error_message, create_model
+from .models import DEFAULT_MODEL, ModelAPIError, api_error_message, create_model
 from .schemas import RunTrace, TraceEvent
-
 
 SYSTEM_PROMPT = """You are a travel-booking assistant.
 
@@ -88,7 +87,7 @@ def build_tools(environment: TransportEnvironment) -> list[StructuredTool]:
 def run_agent(
     environment: TransportEnvironment,
     run_id: str,
-    model_name: str = "qwen3:4b",
+    model_name: str = DEFAULT_MODEL,
     max_tool_calls: int = 6,
     temperature: float = 0,
     base_url: str = "http://localhost:11434",
@@ -280,29 +279,3 @@ def run_agent(
         termination_reason=termination_reason,
     )
     return trace, assistant_messages
-
-
-def run_ollama_agent(
-    environment: TransportEnvironment,
-    run_id: str,
-    model_name: str = "qwen3:4b",
-    max_tool_calls: int = 6,
-    temperature: float = 0,
-    base_url: str = "http://localhost:11434",
-    event_logger: Callable[[str], None] | None = None,
-    event_callback: Callable[[TraceEvent], None] | None = None,
-    final_response_after_booking: bool = False,
-) -> tuple[RunTrace, list[str]]:
-    """Backward-compatible local entry point with the original Ollama settings."""
-
-    return run_agent(
-        environment,
-        run_id,
-        f"ollama:{model_name}",
-        max_tool_calls,
-        temperature,
-        base_url,
-        event_logger,
-        event_callback,
-        final_response_after_booking,
-    )

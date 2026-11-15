@@ -1,7 +1,7 @@
 """Minimal pilot: build the task file from the families, then run a model over it.
 
     python -m preference_override.pilot build
-    python -m preference_override.pilot run --model qwen3:4b --split calibration --limit 3
+    python -m preference_override.pilot run --model google:gemini-3.5-flash-lite --split calibration --limit 3
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from random import Random
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .models import DEFAULT_MODEL
 from .schemas import (
     DatasetSplit,
     ExperimentalConditions,
@@ -182,6 +183,9 @@ def run(model: str, split: str | None, limit: int | None, ids: list[str] | None)
     if split:
         tasks = [t for t in tasks if t.dataset_metadata.dataset_split == split]
     if ids:
+        unknown = sorted(set(ids) - {t.scenario_id for t in tasks})
+        if unknown:
+            raise SystemExit(f"Unknown task IDs (or not in --split): {', '.join(unknown)}")
         tasks = [t for t in tasks if t.scenario_id in ids]
     tasks = tasks[:limit] if limit else tasks
 
@@ -209,7 +213,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("build", help=f"regenerate {TASKS_PATH}")
     run_parser = sub.add_parser("run", help="run a model over the tasks")
-    run_parser.add_argument("--model", default="qwen3:4b")
+    run_parser.add_argument("--model", default=DEFAULT_MODEL)
     run_parser.add_argument("--split", choices=["calibration", "validation", "blind_test"])
     run_parser.add_argument("--limit", type=int)
     run_parser.add_argument("--ids", nargs="+", help="specific task IDs, e.g. T03_F01_large")
