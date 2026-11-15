@@ -193,7 +193,7 @@ def test_native_and_compatible_tool_round_trips(
             # This model uses provider-fixed sampling and the current SDK removes
             # custom temperature from the serialized request.
             assert "temperature" not in config
-            assert trace.agent["requested_temperature"] == 0
+            assert trace.agent["requested_temperature"] == 1.0
         else:
             assert config["temperature"] == trace.agent["temperature"] == 1.0
         assert config["maxOutputTokens"] == 4096

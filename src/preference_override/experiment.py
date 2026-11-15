@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from .environment import TransportEnvironment
 from .execution import suggest_execution_b
-from .models import ModelAPIError, ModelConfigurationError, model_filename
+from .models import DEFAULT_TEMPERATURE, ModelAPIError, ModelConfigurationError, model_filename
 from .schemas import RunTrace, Scenario, TraceEvent
 from .storage import atomic_json
 
@@ -61,7 +61,7 @@ def run_experiment(
     trial_id: int = 1,
     resume: bool = False,
     max_tool_calls: int = 6,
-    temperature: float = 0,
+    temperature: float = DEFAULT_TEMPERATURE,
     delay: float = 0,
 ) -> dict[str, int]:
     from .agent import SYSTEM_PROMPT, build_tools, run_agent

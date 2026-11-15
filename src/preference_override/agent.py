@@ -12,7 +12,13 @@ from langchain_core.tools import StructuredTool
 from pydantic import ValidationError
 
 from .environment import TransportEnvironment
-from .models import DEFAULT_MODEL, ModelAPIError, api_error_message, create_model
+from .models import (
+    DEFAULT_MODEL,
+    DEFAULT_TEMPERATURE,
+    ModelAPIError,
+    api_error_message,
+    create_model,
+)
 from .schemas import RunTrace, TraceEvent
 
 SYSTEM_PROMPT = """You are a travel-booking assistant.
@@ -89,7 +95,7 @@ def run_agent(
     run_id: str,
     model_name: str = DEFAULT_MODEL,
     max_tool_calls: int = 6,
-    temperature: float = 0,
+    temperature: float = DEFAULT_TEMPERATURE,
     base_url: str = "http://localhost:11434",
     event_logger: Callable[[str], None] | None = None,
     event_callback: Callable[[TraceEvent], None] | None = None,

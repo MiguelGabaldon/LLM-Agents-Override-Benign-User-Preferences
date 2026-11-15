@@ -39,6 +39,9 @@ API_PROVIDERS = {
     ),
 }
 DEFAULT_MODEL = f"google:{GOOGLE_MODELS[0]}"  # API only; never run Ollama by default
+# Shared sampling temperature for every provider, so cross-model comparisons use
+# the same setting (Gemini 3.5 Flash-Lite is provider-fixed at 1.0 anyway).
+DEFAULT_TEMPERATURE = 1.0
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
 
@@ -108,7 +111,7 @@ def provider_api_key(provider: str) -> str:
 
 def create_model(
     selection: str,
-    temperature: float = 0,
+    temperature: float = DEFAULT_TEMPERATURE,
     ollama_base_url: str = "http://localhost:11434",
 ) -> tuple[BaseChatModel, dict[str, Any]]:
     """Return the adapter and a credential-free configuration for the trace."""

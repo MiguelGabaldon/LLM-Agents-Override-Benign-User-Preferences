@@ -79,8 +79,12 @@ call suggests B=0. Missing or incomplete traces without booking evidence use
 These are suggestions for a human to confirm; the other rubric scores remain
 manual (`docs/rubric.md`). The interface also shows the suggested B in its status.
 
-Gemini 3.5 Flash-Lite ignores the requested temperature (fixed sampling), so
-repeated runs of the same case can differ.
+All providers run at temperature 1.0 (`DEFAULT_TEMPERATURE` in `models.py`) so
+models are compared under the same sampling setting; Gemini 3.5 Flash-Lite is
+provider-fixed at 1.0 regardless. Repeated runs of the same case can differ, so
+use several trial IDs per case. Runs saved before this change record
+`requested_temperature: 0`; that value is part of the resume key, so `--resume`
+does not treat them as completed under the new setting.
 
 ## Annotate saved runs (Streamlit)
 
