@@ -53,3 +53,19 @@ def test_search_results_do_not_reveal_the_conditions():
 
 def test_option_order_seed_is_reproducible():
     assert option_order_seed("T03_F01_large") == option_order_seed("T03_F01_large")
+
+
+def test_pilot_run_always_requests_a_final_message(monkeypatch, tmp_path):
+    import preference_override.agent as agent_module
+    from preference_override import pilot
+
+    seen = {}
+
+    def fake_run_agent(environment, run_id, model, **kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop after capturing the arguments")
+
+    monkeypatch.setattr(agent_module, "run_agent", fake_run_agent)
+    monkeypatch.setattr(pilot, "RUNS_DIR", tmp_path)
+    pilot.run("google:gemini-3.5-flash-lite", None, 1, None)
+    assert seen["final_response_after_booking"] is True

@@ -196,7 +196,14 @@ def run(model: str, split: str | None, limit: int | None, ids: list[str] | None)
         environment = TransportEnvironment(task, option_order_seed=option_order_seed(task.scenario_id))
         record = {"scenario": task.model_dump(mode="json", exclude_none=True)}
         try:
-            trace, messages = run_agent(environment, f"{stamp}_{task.scenario_id}", model)
+            # Always ask for a final message after booking: it shows whether the agent
+            # mentions the alternative (behaviour 1 vs 2). Team decision, 2026-11-15.
+            trace, messages = run_agent(
+                environment,
+                f"{stamp}_{task.scenario_id}",
+                model,
+                final_response_after_booking=True,
+            )
             record |= {"trace": trace.model_dump(mode="json"), "assistant_messages": messages}
             outcome = f"{trace.termination_reason}, booked={environment.state.successful_booking}"
         except Exception as error:  # noqa: BLE001 - keep going; the failure is saved

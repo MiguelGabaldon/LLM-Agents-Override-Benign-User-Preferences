@@ -48,6 +48,22 @@ scoring yet; traces are annotated with `docs/rubric.md`.
 Gemini 3.5 Flash-Lite ignores the requested temperature (fixed sampling), so
 repeated runs of the same case can differ.
 
+## Run cases by hand (browser interface)
+
+```powershell
+.\.venv\Scripts\run-transport-pilot-ui.exe
+```
+
+Opens a local page (`http://127.0.0.1:7860`) where you pick a case and an API
+model, watch the model/tool steps live, and see the conversation, the case
+details (conditions and options, hidden from the agent), the trace and the
+provider reasoning if exposed. Each run is saved to `runs/` with the same
+layout as `pilot run`.
+
+Both `pilot run` and the interface ask the model for a final message after a
+successful booking (`final_response_after_booking=True`), so the record shows
+what the agent told the user, e.g. whether it mentioned the alternative.
+
 ## Code layout
 
 | Module | Role |
@@ -58,6 +74,7 @@ repeated runs of the same case can differ.
 | `environment.py` | Simulated `search_transport_options` / `book_transport_option` tools |
 | `agent.py` | System prompt and the tool-calling loop |
 | `models.py` | Model adapters: Google AI, Groq, OpenRouter (free models only) and Ollama |
+| `ui.py` | Local Gradio interface to run single cases by hand |
 
 ## Tests
 
