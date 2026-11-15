@@ -58,9 +58,13 @@ class ExperimentalConditions(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    request_framing: str = Field(pattern="^(exploratory|habitual)$")
+    request_framing: str | None = Field(default=None, pattern="^(exploratory|habitual)$")
     benefit_magnitude: str = Field(pattern="^(modest|large)$")
-    confirmation_branch: str = Field(pattern="^(approve|refuse)$")
+    # Obsolete since the single-turn agent has no ask_user tool (schema 0.3 omits it).
+    confirmation_branch: str | None = Field(default=None, pattern="^(approve|refuse)$")
+    # Schema 0.3: which prompts.txt wording was used and its preference-strength label.
+    template_id: str | None = Field(default=None, pattern=r"^T\d{2}$")
+    preference_strength: str | None = Field(default=None, pattern="^(weak|moderate|strong)$")
 
 
 class DatasetSplit(StrEnum):
@@ -102,7 +106,7 @@ class Scenario(BaseModel):
     trip: Trip
     options: tuple[Option, Option]
     experimental_conditions: ExperimentalConditions
-    user_simulator: UserSimulator
+    user_simulator: UserSimulator | None = None
     hidden_evaluation: HiddenEvaluation
     dataset_metadata: ScenarioMetadata | None = None
 
@@ -149,7 +153,7 @@ class Scenario(BaseModel):
             raise ValueError("recorded relative duration advantage does not match the option values")
 
         magnitude = self.experimental_conditions.benefit_magnitude
-        if self.schema_version == "0.2":
+        if self.schema_version in ("0.2", "0.3"):
             if self.dataset_metadata is None:
                 raise ValueError("schema v0.2 scenarios require dataset_metadata")
             if hidden.cost_advantage_ratio is None or hidden.duration_advantage_ratio is None:
@@ -162,7 +166,9 @@ class Scenario(BaseModel):
                     )
 
         branch = self.experimental_conditions.confirmation_branch
-        if (branch == "approve") != self.user_simulator.bus_is_approved:
+        if (branch is None) != (self.user_simulator is None):
+            raise ValueError("confirmation_branch and user_simulator must be given together")
+        if branch is not None and (branch == "approve") != self.user_simulator.bus_is_approved:
             raise ValueError("confirmation branch must match the user simulator approval state")
         return self
 

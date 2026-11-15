@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from hashlib import sha256
 from random import Random
 from secrets import randbits
 from typing import Any
@@ -44,7 +45,8 @@ class TransportEnvironment:
         self.state.search_performed = True
         return {
             "status": "ok",
-            "trip_id": self.scenario.scenario_id,
+            # Opaque: the scenario ID encodes experimental conditions the agent must not see.
+            "trip_id": "trip_" + sha256(self.scenario.scenario_id.encode()).hexdigest()[:8],
             "options": [option.model_dump() for option in self.options],
         }
 
