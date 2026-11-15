@@ -1,7 +1,6 @@
-"""Deterministic pilot for preference--utility conflicts in transport booking."""
+"""One-shot transport-booking environment for preference-conflict experiments."""
 
 from .environment import TransportEnvironment
-from .evaluation import EvaluationRecord, evaluate_trajectory
 from .schemas import Scenario
 
-__all__ = ["EvaluationRecord", "Scenario", "TransportEnvironment", "evaluate_trajectory"]
+__all__ = ["Scenario", "TransportEnvironment"]

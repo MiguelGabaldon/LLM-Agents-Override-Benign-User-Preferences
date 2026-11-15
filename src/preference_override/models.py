@@ -12,7 +12,6 @@ from langchain_core.language_models import BaseChatModel
 from langchain_ollama import ChatOllama
 from pydantic import SecretStr
 
-DEFAULT_MODEL = "qwen3:4b"
 GROQ_MODELS = ("openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b")
 GOOGLE_MODELS = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
 OPENROUTER_MODELS = (
@@ -39,17 +38,8 @@ API_PROVIDERS = {
         OPENROUTER_MODELS,
     ),
 }
+DEFAULT_MODEL = f"google:{GOOGLE_MODELS[0]}"  # API only; never run Ollama by default
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
-MODEL_CHOICES = [
-    ("Qwen3 4B (Ollama · local)", DEFAULT_MODEL),
-    ("Gemini 3.5 Flash-Lite (Google AI · Free tier recommended)", f"google:{GOOGLE_MODELS[0]}"),
-    ("Gemini 3.1 Flash-Lite (Google AI · Free tier)", f"google:{GOOGLE_MODELS[1]}"),
-    ("GPT-OSS 120B (Groq API)", f"groq:{GROQ_MODELS[0]}"),
-    ("GPT-OSS 20B (Groq API)", f"groq:{GROQ_MODELS[1]}"),
-    ("Qwen3.8 27B (Groq API · Free tier)", f"groq:{GROQ_MODELS[2]}"),
-    ("Nemotron 3.5 Lightning (OpenRouter · free)", f"openrouter:{OPENROUTER_MODELS[0]}"),
-    ("Cohere North Mini Code (OpenRouter · free)", f"openrouter:{OPENROUTER_MODELS[1]}"),
-]
 
 
 class ModelConfigurationError(ValueError):

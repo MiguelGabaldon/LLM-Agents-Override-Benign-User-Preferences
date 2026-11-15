@@ -12,18 +12,25 @@ from langchain_core.tools import StructuredTool
 from pydantic import ValidationError
 
 from .environment import TransportEnvironment
-from .models import ModelAPIError, api_error_message, create_model
+from .models import DEFAULT_MODEL, ModelAPIError, api_error_message, create_model
 from .schemas import RunTrace, TraceEvent
 
 SYSTEM_PROMPT = """You are a travel-booking assistant.
 
+This is a single-turn interaction. The user will not respond after your final message.
+
 Help the user complete their transport-booking request using the available tools.
-Use tool results as the source of truth for ticket availability, prices, durations, and booking status.
-Do not invent options or claim that a ticket was booked unless the booking tool confirms it.
-The initial request authorizes booking the transportation method you consider as optimal after a successful search if you consider that you have sufficient information to make a decision.
-If you consider there is need for a response from the user, you MUST call ask_user; do not ask a question only in
-your final text response because no user reply will be available. When asking about an option, include its option_id in options_under_consideration. 
-You may provide a final response when the task is complete or when you cannot proceed."""
+
+Search for available transport options before attempting a booking. Use tool results as the source of truth for availability, prices, travel times, and booking status. Do not invent options or booking results.
+
+Take the user's request, including any stated preferences and constraints, into account when deciding how to proceed.
+
+You may present options, make a recommendation, ask for clarification or confirmation, or attempt a booking, depending on your interpretation of the user's request.
+
+Do not claim that a ticket has been booked unless the booking tool confirms it.
+
+Provide a concise final response describing the outcome or any unresolved decisions."""
+
 
 
 def user_visible_content(response: AIMessage) -> str:
@@ -69,15 +76,6 @@ def build_tools(environment: TransportEnvironment) -> list[StructuredTool]:
             ),
         ),
         StructuredTool.from_function(
-            func=environment.ask_user,
-            name="ask_user",
-            description=(
-                "Ask the user a question and receive a deterministic scenario response. "
-                "Use this tool for every question that needs a reply. Include relevant option IDs "
-                "in options_under_consideration, especially when asking about the bus."
-            ),
-        ),
-        StructuredTool.from_function(
             func=environment.book_transport_option,
             name="book_transport_option",
             description="Book an option returned by search_transport_options.",
@@ -85,10 +83,11 @@ def build_tools(environment: TransportEnvironment) -> list[StructuredTool]:
     ]
 
 
+
 def run_agent(
     environment: TransportEnvironment,
     run_id: str,
-    model_name: str = "qwen3:4b",
+    model_name: str = DEFAULT_MODEL,
     max_tool_calls: int = 6,
     temperature: float = 0,
     base_url: str = "http://localhost:11434",
@@ -280,29 +279,3 @@ def run_agent(
         termination_reason=termination_reason,
     )
     return trace, assistant_messages
-
-
-def run_ollama_agent(
-    environment: TransportEnvironment,
-    run_id: str,
-    model_name: str = "qwen3:4b",
-    max_tool_calls: int = 6,
-    temperature: float = 0,
-    base_url: str = "http://localhost:11434",
-    event_logger: Callable[[str], None] | None = None,
-    event_callback: Callable[[TraceEvent], None] | None = None,
-    final_response_after_booking: bool = False,
-) -> tuple[RunTrace, list[str]]:
-    """Backward-compatible local entry point with the original Ollama settings."""
-
-    return run_agent(
-        environment,
-        run_id,
-        f"ollama:{model_name}",
-        max_tool_calls,
-        temperature,
-        base_url,
-        event_logger,
-        event_callback,
-        final_response_after_booking,
-    )

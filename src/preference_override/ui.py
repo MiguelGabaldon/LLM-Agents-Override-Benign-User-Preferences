@@ -14,23 +14,34 @@ from uuid import uuid4
 import gradio as gr
 
 from .agent import run_agent
-from .cli import DEFAULT_SCENARIO_PATH
 from .environment import TransportEnvironment
-from .evaluation import evaluate_trajectory
 from .models import (
     DEFAULT_MODEL,
-    MODEL_CHOICES,
+    GOOGLE_MODELS,
+    GROQ_MODELS,
+    OPENROUTER_MODELS,
     ModelAPIError,
     ModelConfigurationError,
     model_filename,
     resolve_model,
 )
+from .pilot import TASKS_PATH, option_order_seed
 from .scenarios import load_scenarios
-from .schemas import RunTrace, TraceEvent
-from .scoring import score_behavior
+from .schemas import RunTrace, Scenario, TraceEvent
+
+# API models only: the interface never offers local Ollama models.
+MODEL_CHOICES = [
+    ("Gemini 3.5 Flash-Lite (Google AI · Free tier)", f"google:{GOOGLE_MODELS[0]}"),
+    ("Gemini 3.1 Flash-Lite (Google AI · Free tier)", f"google:{GOOGLE_MODELS[1]}"),
+    ("GPT-OSS 120B (Groq API)", f"groq:{GROQ_MODELS[0]}"),
+    ("GPT-OSS 20B (Groq API)", f"groq:{GROQ_MODELS[1]}"),
+    ("Qwen3.8 27B (Groq API · Free tier)", f"groq:{GROQ_MODELS[2]}"),
+    ("Nemotron 3.5 Lightning (OpenRouter · free)", f"openrouter:{OPENROUTER_MODELS[0]}"),
+    ("Cohere North Mini Code (OpenRouter · free)", f"openrouter:{OPENROUTER_MODELS[1]}"),
+]
 
 
-def scenario_choices(scenarios_path: Path = DEFAULT_SCENARIO_PATH) -> list[str]:
+def scenario_choices(scenarios_path: Path = TASKS_PATH) -> list[str]:
     """Return scenario identifiers for the interface selector."""
 
     return [scenario.scenario_id for scenario in load_scenarios(scenarios_path)]
@@ -52,12 +63,6 @@ def _conversation(user_request: str, events: list[TraceEvent]) -> list[dict[str,
         payload = event.payload
         if event.event_type == "assistant_message":
             role, content = "assistant", payload.get("content")
-        elif event.event_type == "tool_call" and payload.get("tool_name") == "ask_user":
-            if not payload.get("execution_allowed", True):
-                continue
-            role, content = "assistant", payload["arguments"].get("question")
-        elif event.event_type == "tool_result" and payload.get("tool_name") == "ask_user":
-            role, content = "user", payload["result"].get("response")
         else:
             continue
         if isinstance(content, str) and content.strip():
@@ -76,12 +81,29 @@ def _reasoning(events: list[TraceEvent]) -> str:
     )
 
 
+def _case_details(scenario: Scenario) -> str:
+    """Conditions and options for the human annotator; never sent to the agent."""
+    metadata = scenario.dataset_metadata
+    return json.dumps(
+        {
+            "scenario_id": scenario.scenario_id,
+            "experimental_conditions": scenario.experimental_conditions.model_dump(
+                exclude_none=True
+            ),
+            "options": [option.model_dump() for option in scenario.options],
+            "hidden_evaluation": scenario.hidden_evaluation.model_dump(),
+            "dataset_split": metadata.dataset_split if metadata else None,
+        },
+        indent=2,
+    )
+
+
 def run_selected_scenario(
     scenario_id: str, model_name: str, max_tool_calls: float
 ) -> Generator[tuple[str, list[dict[str, str]], str, str, str | None, str, str], None, None]:
     """Run in a worker thread and yield step-level updates to the interface."""
 
-    scenarios = load_scenarios(DEFAULT_SCENARIO_PATH)
+    scenarios = load_scenarios(TASKS_PATH)
     scenario = next((item for item in scenarios if item.scenario_id == scenario_id), None)
     if scenario is None:
         yield "", [], "", "", None, "", f"**Error:** unknown scenario `{scenario_id}`."
@@ -89,7 +111,11 @@ def run_selected_scenario(
 
     progress_queue: Queue[str | TraceEvent] = Queue()
     result: dict[str, Any] = {}
-    environment = TransportEnvironment(scenario)
+    # Same option display order as `pilot run` uses for this case.
+    environment = TransportEnvironment(
+        scenario, option_order_seed=option_order_seed(scenario.scenario_id)
+    )
+    details = _case_details(scenario)
     run_id = f"{scenario.scenario_id}_{uuid4().hex[:8]}"
 
     def execute() -> None:
@@ -117,7 +143,7 @@ def run_selected_scenario(
     received_events: list[TraceEvent] = []
     conversation = _conversation(scenario.user_request, received_events)
     reasoning = "Waiting for provider reasoning..."
-    yield _format_events(events), conversation, "", "", None, reasoning, "**Running...**"
+    yield _format_events(events), conversation, details, "", None, reasoning, "**Running...**"
 
     while worker.is_alive() or not progress_queue.empty():
         try:
@@ -133,7 +159,7 @@ def run_selected_scenario(
             pass
         # Keep the conversation on screen while a model/tool is working; the
         # generator also stays responsive when a model has not returned yet.
-        yield _format_events(events), conversation, "", "", None, reasoning, "**Running...**"
+        yield _format_events(events), conversation, details, "", None, reasoning, "**Running...**"
 
     if "error" in result:
         events.append(f"Run failed: {result['error']}")
@@ -141,7 +167,7 @@ def run_selected_scenario(
             yield (
                 _format_events(events),
                 conversation,
-                "",
+                details,
                 "",
                 None,
                 _reasoning(received_events),
@@ -165,22 +191,14 @@ def run_selected_scenario(
 
     trace = result["trace"]
     assistant_messages = result["assistant_messages"]
-    labels = score_behavior(
-        scenario,
-        trace.final_environment_state,
-        assistant_messages,
-        termination_reason=trace.termination_reason,
-    )
-    evaluation = evaluate_trajectory(scenario, trace, assistant_messages)
     output_path = _output_path(scenario.scenario_id, model_name)
+    # Same record layout as `pilot run`, plus how and when the run was launched.
     record = {
-        "run_timestamp_utc": datetime.now(UTC).isoformat(),
-        "scenario_id": scenario.scenario_id,
-        "experimental_conditions": scenario.experimental_conditions.model_dump(),
-        "assistant_messages": assistant_messages,
-        "behavioral_labels": labels.model_dump(),
-        "evaluation": evaluation.model_dump(mode="json"),
+        "scenario": scenario.model_dump(mode="json", exclude_none=True),
         "trace": trace.model_dump(mode="json"),
+        "assistant_messages": assistant_messages,
+        "launched_from": "ui",
+        "run_timestamp_utc": datetime.now(UTC).isoformat(),
     }
     if "error" in result:
         record["error"] = result["error"]
@@ -212,7 +230,7 @@ def run_selected_scenario(
     yield (
         _format_events(events),
         conversation,
-        json.dumps(evaluation.model_dump(mode="json"), indent=2),
+        details,
         json.dumps(trace.model_dump(mode="json"), indent=2),
         saved_path,
         _reasoning(trace.events),
@@ -227,24 +245,24 @@ def create_demo() -> gr.Blocks:
     with gr.Blocks(title="Preference Override Pilot") as demo:
         gr.Markdown(
             "# Preference Override Pilot\n"
-            "Run one deterministic transport scenario with Ollama locally or an API model. "
-            "The progress pane updates after every model or tool step."
+            "Run one case from `prompt_cases_v0_3.json` with an API model. "
+            "The progress pane updates after every model or tool step. "
+            "There is no automatic scoring: annotate the trace with `docs/rubric.md`."
         )
         with gr.Row():
             scenario_id = gr.Dropdown(
                 choices=scenarios,
                 value=scenarios[0],
-                label="Scenario",
-                info="The scenario controls preference framing, benefit magnitude, and response branch.",
+                label="Case",
+                info="ID = prompt template _ trip family _ benefit magnitude (modest/large).",
             )
             model_name = gr.Dropdown(
                 label="Models",
                 choices=MODEL_CHOICES,
                 value=DEFAULT_MODEL,
-                allow_custom_value=True,
+                allow_custom_value=False,
                 info="Use Free-tier Google/Groq accounts; quotas apply. "
-                "OpenRouter selections use only free endpoints. "
-                "You can also enter any installed Ollama model name.",
+                "OpenRouter selections use only free endpoints.",
             )
             max_tool_calls = gr.Slider(
                 minimum=1,
@@ -253,18 +271,20 @@ def create_demo() -> gr.Blocks:
                 step=1,
                 label="Maximum tool calls",
             )
-        run_button = gr.Button("Run scenario", variant="primary")
-        status = gr.Markdown("Choose a scenario and model, then run it.")
+        run_button = gr.Button("Run case", variant="primary")
+        status = gr.Markdown("Choose a case and model, then run it.")
         with gr.Row():
             progress = gr.Textbox(label="Live progress", lines=14, interactive=False)
             conversation = gr.Chatbot(
-                label="Conversation (simulated user)",
+                label="Conversation (what the user sees)",
                 height=450,
                 allow_tags=False,
                 group_consecutive_messages=False,
             )
         with gr.Row():
-            labels = gr.Code(label="Behavioral labels", language="json", interactive=False)
+            labels = gr.Code(
+                label="Case details (hidden from the agent)", language="json", interactive=False
+            )
             trace = gr.Code(label="Trace", language="json", interactive=False)
         record_file = gr.File(label="Saved run record")
         reasoning = gr.Textbox(
