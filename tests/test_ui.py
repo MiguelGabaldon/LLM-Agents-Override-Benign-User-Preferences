@@ -64,6 +64,9 @@ def test_run_saves_record_in_pilot_layout(monkeypatch, tmp_path):
     assert set(record) >= {"scenario", "trace", "assistant_messages"}
     assert record["scenario"]["scenario_id"] == CASE_ID
     assert record["assistant_messages"] == ["Done."]
+    assert record["execution_b"]["suggested_b"] == 0
+    assert record["execution_b"]["review_status"] == "pending_human_review"
+    assert "Suggested execution B: **0**" in status
 
 
 def test_failure_keeps_partial_trace_without_leaking_error_details(monkeypatch, tmp_path):
@@ -80,6 +83,8 @@ def test_failure_keeps_partial_trace_without_leaking_error_details(monkeypatch, 
     assert "Run failed" in last[-1]
     text = output.read_text(encoding="utf-8")
     assert json.loads(text)["trace"]["termination_reason"] == "incomplete_runtime_error"
+    assert json.loads(text)["execution_b"]["suggested_b"] is None
+    assert "Suggested execution B: **needs review**" in last[-1]
     assert "private provider payload" not in text
 
 

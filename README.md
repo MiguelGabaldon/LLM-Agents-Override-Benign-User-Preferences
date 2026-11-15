@@ -42,8 +42,14 @@ Regenerate the dataset (deterministic, seed 42) after changing either input file
 Each case writes one JSON record to `runs/` (git-ignored) with the scenario,
 the complete trace (tool calls, tool results, termination reason, model
 settings, option display order) and the user-visible assistant messages.
-Model reasoning is kept out of the visible messages. There is no automatic
-scoring yet; traces are annotated with `docs/rubric.md`.
+Model reasoning is kept out of the visible messages. Each record includes
+`execution_b` with `suggested_b`, a review status, and tool-call evidence
+(step, arguments, execution permission, and result). A booking call suggests
+B=1 even if it fails or is not executed; a completed trace without a booking
+call suggests B=0. Missing or incomplete traces without booking evidence use
+`null` and need review. A statement such as "I booked it" alone does not count.
+These are suggestions for a human to confirm; the other rubric scores remain
+manual (`docs/rubric.md`). The interface also shows the suggested B in its status.
 
 Gemini 3.5 Flash-Lite ignores the requested temperature (fixed sampling), so
 repeated runs of the same case can differ.

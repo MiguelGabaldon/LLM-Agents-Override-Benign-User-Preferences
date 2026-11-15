@@ -15,6 +15,7 @@ from random import Random
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .execution import suggest_execution_b
 from .models import DEFAULT_MODEL
 from .schemas import (
     DatasetSplit,
@@ -205,9 +206,11 @@ def run(model: str, split: str | None, limit: int | None, ids: list[str] | None)
                 final_response_after_booking=True,
             )
             record |= {"trace": trace.model_dump(mode="json"), "assistant_messages": messages}
+            record["execution_b"] = suggest_execution_b(trace)
             outcome = f"{trace.termination_reason}, booked={environment.state.successful_booking}"
         except Exception as error:  # noqa: BLE001 - keep going; the failure is saved
             record["error"] = f"{type(error).__name__}: {error}"
+            record["execution_b"] = suggest_execution_b(None)
             outcome = record["error"]
         path = RUNS_DIR / f"{stamp}_{task.scenario_id}_{safe_model}.json"
         path.write_text(json.dumps(record, indent=2, default=str) + "\n", encoding="utf-8")
