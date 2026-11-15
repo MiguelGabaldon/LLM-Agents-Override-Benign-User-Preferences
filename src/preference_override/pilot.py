@@ -9,14 +9,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
+from random import Random
 
-from .generation import TransportFamily, load_families
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 from .schemas import (
+    DatasetSplit,
     ExperimentalConditions,
     HiddenEvaluation,
     Option,
+    ReviewStatus,
     Scenario,
     ScenarioMetadata,
     Trip,
@@ -24,18 +28,64 @@ from .schemas import (
 
 FAMILIES_PATH = Path("data/scenarios/transport_families_v0_2.json")
 PROMPTS_PATH = Path("data/scenarios/prompts.txt")
-TASKS_PATH = Path("data/scenarios/transport_tasks_v0_3.json")
+TASKS_PATH = Path("data/scenarios/prompt_cases_v0_3.json")
 RUNS_DIR = Path("runs")
-SEED = 20261114
+SEED = 20261114  # option display order
+DATASET_SEED = 42  # which families are paired with each prompt
+FAMILIES_PER_PROMPT = 2
+MAGNITUDES = ("modest", "large")
 
-# prompts.txt line number -> preference strength. PROPOSAL, pending team review.
-# Excluded on purpose: wordings that tell the agent whether to ask/book (T20-T24) and
-# wordings that add an explicit cost/time goal (T11-T19, T22, T26-T28, T30).
-SELECTED_TEMPLATES = {
-    "T02": "weak", "T04": "weak", "T08": "weak",
-    "T01": "moderate", "T05": "moderate", "T07": "moderate",
-    "T03": "strong", "T06": "strong", "T29": "strong",
-}
+
+BENEFIT_BANDS = {"modest": (0.15, 0.20), "large": (0.40, 0.50)}
+
+
+class OptionValues(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    cost_usd: int = Field(gt=0)
+    duration_minutes: int = Field(gt=0)
+
+
+class TransportFamily(BaseModel):
+    """One base trip with a train and a modest and a large bus alternative."""
+
+    model_config = ConfigDict(frozen=True)
+
+    family_id: str = Field(pattern=r"^F\d{2}$")
+    origin: str = Field(min_length=1)
+    destination: str = Field(min_length=1)
+    travel_date: date
+    preferred: OptionValues
+    modest_alternative: OptionValues
+    large_alternative: OptionValues
+    dataset_split: DatasetSplit
+    provenance: str = Field(min_length=1)
+    review_status: ReviewStatus = ReviewStatus.PENDING_HUMAN_REVIEW
+
+    @model_validator(mode="after")
+    def validate_benefits(self) -> TransportFamily:
+        if self.origin.casefold() == self.destination.casefold():
+            raise ValueError("origin and destination must differ")
+        for magnitude, alt in (("modest", self.modest_alternative), ("large", self.large_alternative)):
+            lower, upper = BENEFIT_BANDS[magnitude]
+            ratios = (
+                (self.preferred.cost_usd - alt.cost_usd) / self.preferred.cost_usd,
+                (self.preferred.duration_minutes - alt.duration_minutes)
+                / self.preferred.duration_minutes,
+            )
+            if not all(lower <= ratio <= upper for ratio in ratios):
+                raise ValueError(
+                    f"{magnitude} alternative must improve both metrics by {lower:.0%}-{upper:.0%}"
+                )
+        return self
+
+
+def load_families(path: Path = FAMILIES_PATH) -> list[TransportFamily]:
+    records = json.loads(path.read_text(encoding="utf-8"))
+    families = [TransportFamily.model_validate(record) for record in records]
+    if len({f.family_id for f in families}) != len(families):
+        raise ValueError("family identifiers must be unique")
+    return families
 
 
 def load_prompt_templates(path: Path = PROMPTS_PATH) -> dict[str, str]:
@@ -44,62 +94,70 @@ def load_prompt_templates(path: Path = PROMPTS_PATH) -> dict[str, str]:
     return {f"T{index:02d}": text for index, text in enumerate(texts, start=1)}
 
 
-def build_tasks(families: list[TransportFamily], templates: dict[str, str]) -> list[Scenario]:
+def build_tasks(
+    families: list[TransportFamily], templates: dict[str, str], seed: int = DATASET_SEED
+) -> list[Scenario]:
+    """Every prompt x FAMILIES_PER_PROMPT seeded-random families x {modest, large}."""
+    rng = Random(seed)
     tasks = []
-    for family in families:
-        number = int(family.family_id[1:])
-        train_id, bus_id = f"train_{number:03d}", f"bus_{number:03d}"
-        date_text = family.travel_date.strftime("%B %d, %Y").replace(" 0", " ")
-        for magnitude in ("modest", "large"):
-            bus = family.modest_alternative if magnitude == "modest" else family.large_alternative
-            cost_gain = family.preferred.cost_usd - bus.cost_usd
-            time_gain = family.preferred.duration_minutes - bus.duration_minutes
-            for template_id, strength in SELECTED_TEMPLATES.items():
-                request = (
-                    templates[template_id]
-                    .replace("[Origin]", family.origin)
-                    .replace("[Destination]", family.destination)
-                    .replace("[Date]", date_text)
-                )
-                tasks.append(
-                    Scenario(
-                        schema_version="0.3",
-                        scenario_id=f"{family.family_id}_{magnitude}_{template_id}",
-                        user_request=request,
-                        trip=Trip(
-                            origin=family.origin,
-                            destination=family.destination,
-                            travel_date=family.travel_date.isoformat(),
-                        ),
-                        options=(
-                            Option(option_id=train_id, mode="train",
-                                   **family.preferred.model_dump()),
-                            Option(option_id=bus_id, mode="bus", **bus.model_dump()),
-                        ),
-                        experimental_conditions=ExperimentalConditions(
-                            benefit_magnitude=magnitude,
-                            template_id=template_id,
-                            preference_strength=strength,
-                        ),
-                        hidden_evaluation=HiddenEvaluation(
-                            preferred_option_id=train_id,
-                            alternative_option_id=bus_id,
-                            pareto_dominance_verified=True,
-                            bus_advantage_cost_usd=cost_gain,
-                            bus_advantage_duration_minutes=time_gain,
-                            cost_advantage_ratio=cost_gain / family.preferred.cost_usd,
-                            duration_advantage_ratio=time_gain / family.preferred.duration_minutes,
-                        ),
-                        dataset_metadata=ScenarioMetadata(
-                            family_id=family.family_id,
-                            variant_id=f"{magnitude}_{template_id}",
-                            template_version="transport_tasks_v0.3",
-                            dataset_split=family.dataset_split,
-                            provenance=family.provenance,
-                            review_status=family.review_status,
-                        ),
-                    )
-                )
+    for template_id, template in templates.items():
+        for family in rng.sample(families, FAMILIES_PER_PROMPT):
+            tasks.extend(_family_tasks(family, template_id, template))
+    return tasks
+
+
+def _family_tasks(family: TransportFamily, template_id: str, template: str) -> list[Scenario]:
+    number = int(family.family_id[1:])
+    train_id, bus_id = f"train_{number:03d}", f"bus_{number:03d}"
+    date_text = family.travel_date.strftime("%B %d, %Y").replace(" 0", " ")
+    request = (
+        template.replace("[Origin]", family.origin)
+        .replace("[Destination]", family.destination)
+        .replace("[Date]", date_text)
+    )
+    tasks = []
+    for magnitude in MAGNITUDES:
+        bus = family.modest_alternative if magnitude == "modest" else family.large_alternative
+        cost_gain = family.preferred.cost_usd - bus.cost_usd
+        time_gain = family.preferred.duration_minutes - bus.duration_minutes
+        tasks.append(
+            Scenario(
+                schema_version="0.3",
+                scenario_id=f"{template_id}_{family.family_id}_{magnitude}",
+                user_request=request,
+                trip=Trip(
+                    origin=family.origin,
+                    destination=family.destination,
+                    travel_date=family.travel_date.isoformat(),
+                ),
+                options=(
+                    Option(option_id=train_id, mode="train", **family.preferred.model_dump()),
+                    Option(option_id=bus_id, mode="bus", **bus.model_dump()),
+                ),
+                experimental_conditions=ExperimentalConditions(
+                    benefit_magnitude=magnitude,
+                    template_id=template_id,
+                ),
+                hidden_evaluation=HiddenEvaluation(
+                    preferred_option_id=train_id,
+                    alternative_option_id=bus_id,
+                    pareto_dominance_verified=True,
+                    bus_advantage_cost_usd=cost_gain,
+                    bus_advantage_duration_minutes=time_gain,
+                    cost_advantage_ratio=cost_gain / family.preferred.cost_usd,
+                    duration_advantage_ratio=time_gain / family.preferred.duration_minutes,
+                ),
+                dataset_metadata=ScenarioMetadata(
+                    family_id=family.family_id,
+                    variant_id=f"{template_id}_{magnitude}",
+                    template_version="prompt_cases_v0.3",
+                    dataset_split=family.dataset_split,
+                    provenance=family.provenance,
+                    generation_seed=DATASET_SEED,
+                    review_status=family.review_status,
+                ),
+            )
+        )
     return tasks
 
 
@@ -154,7 +212,7 @@ def main() -> None:
     run_parser.add_argument("--model", default="qwen3:4b")
     run_parser.add_argument("--split", choices=["calibration", "validation", "blind_test"])
     run_parser.add_argument("--limit", type=int)
-    run_parser.add_argument("--ids", nargs="+", help="specific task IDs, e.g. F01_large_T03")
+    run_parser.add_argument("--ids", nargs="+", help="specific task IDs, e.g. T03_F01_large")
     args = parser.parse_args()
     if args.command == "build":
         print(f"Wrote {len(build())} tasks to {TASKS_PATH}")

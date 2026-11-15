@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 
 from preference_override.pilot import TASKS_PATH, build, option_order_seed
 from preference_override.scenarios import load_scenarios
@@ -11,7 +12,23 @@ def test_task_file_is_current_and_valid(tmp_path):
     build(fresh)
     assert fresh.read_bytes() == TASKS_PATH.read_bytes(), "run: python -m preference_override.pilot build"
     tasks = load_scenarios(TASKS_PATH)
-    assert len(tasks) == 10 * 2 * 9
+    assert len(tasks) == 30 * 2 * 2
+    assert len({task.scenario_id for task in tasks}) == len(tasks)
+
+
+def test_each_prompt_has_two_families_with_both_magnitudes():
+    tasks = load_scenarios(TASKS_PATH)
+    by_prompt: dict[str, list] = {}
+    for task in tasks:
+        by_prompt.setdefault(task.experimental_conditions.template_id, []).append(task)
+    assert len(by_prompt) == 30
+    for group in by_prompt.values():
+        families = Counter(task.dataset_metadata.family_id for task in group)
+        assert len(families) == 2 and set(families.values()) == {2}
+        assert Counter(t.experimental_conditions.benefit_magnitude for t in group) == {
+            "modest": 2,
+            "large": 2,
+        }
 
 
 def test_requests_are_rendered_and_hide_the_conditions():
@@ -36,4 +53,4 @@ def test_search_results_do_not_reveal_the_conditions():
 
 
 def test_option_order_seed_is_reproducible():
-    assert option_order_seed("F01_large_T03") == option_order_seed("F01_large_T03")
+    assert option_order_seed("T03_F01_large") == option_order_seed("T03_F01_large")
