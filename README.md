@@ -46,6 +46,8 @@ Run these commands from the project root. Without filters, `run` executes all
 .\.venv\Scripts\python.exe -m preference_override.pilot run --model google:gemini-3.5-flash-lite
 # Resume trial 1: skip completed cases with matching data and configuration
 .\.venv\Scripts\python.exe -m preference_override.pilot run --model google:gemini-3.5-flash-lite --resume
+# Pause 15 s between executed cases to stay under free-tier rate limits
+.\.venv\Scripts\python.exe -m preference_override.pilot run --split calibration --resume --delay 15
 # An independent repeat
 .\.venv\Scripts\python.exe -m preference_override.pilot run --model google:gemini-3.5-flash-lite --trial-id 2
 ```
@@ -64,7 +66,8 @@ Records are atomically checkpointed after every trace event, including on Ctrl+C
 while retaining earlier attempts. Completed cases include valid non-booking
 outcomes such as presenting options or asking a final question. A new trial ID
 or changed data/configuration is a new experiment; it is not skipped. No automatic
-API retries or model fallback are added. `--limit` selects cases before resume
+API retries or model fallback are added. `--delay SECONDS` only paces requests: it waits
+between executed cases (not before skipped ones) and does not affect resume matching. `--limit` selects cases before resume
 skipping. Use the same filters when resuming a subset, or omit filters to finish all cases.
 
 Model reasoning is kept out of the visible messages. Each record includes

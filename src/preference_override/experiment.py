@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -61,12 +62,15 @@ def run_experiment(
     resume: bool = False,
     max_tool_calls: int = 6,
     temperature: float = 0,
+    delay: float = 0,
 ) -> dict[str, int]:
     from .agent import SYSTEM_PROMPT, build_tools, run_agent
     from .pilot import option_order_seed
 
     if trial_id < 1 or max_tool_calls < 1:
         raise ValueError("trial_id and max_tool_calls must be positive")
+    if delay < 0:
+        raise ValueError("delay must be non-negative")
     model = model.strip()
     folder = model_filename(model)
     if folder in {"", ".", ".."}:
@@ -104,6 +108,9 @@ def run_experiment(
             summary["skipped"] += 1
             print(f"{task.scenario_id}: skipped (completed trial {trial_id})")
             continue
+        # Pause between executed cases only (pacing for provider rate limits; not a retry).
+        if delay and summary["completed"] + summary["failed"]:
+            time.sleep(delay)
 
         run_id = f"{task.scenario_id}_trial{trial_id}_{uuid4().hex}"
         path = directory / f"{run_id}.json"

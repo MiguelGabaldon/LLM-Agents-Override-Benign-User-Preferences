@@ -170,14 +170,14 @@ def option_order_seed(scenario_id: str) -> int:
 def build(out: Path = TASKS_PATH) -> list[Scenario]:
     tasks = build_tasks(load_families(FAMILIES_PATH), load_prompt_templates())
     records = [task.model_dump(mode="json", exclude_none=True) for task in tasks]
-    out.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+    out.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8", newline="\n")
     return tasks
 
 
 def run(
     model: str, split: str | None, limit: int | None, ids: list[str] | None, *,
     trial_id: int = 1, resume: bool = False, output_root: Path | None = None,
-    prompt_ids: list[str] | None = None,
+    prompt_ids: list[str] | None = None, delay: float = 0,
 ) -> dict[str, int]:
     from .experiment import run_experiment
     from .scenarios import load_scenarios
@@ -199,7 +199,7 @@ def run(
         tasks = [t for t in tasks if t.experimental_conditions.template_id in prompt_ids]
     tasks = tasks[:limit] if limit else tasks
     return run_experiment(tasks, model, output_root if output_root is not None else RUNS_DIR,
-                          trial_id=trial_id, resume=resume)
+                          trial_id=trial_id, resume=resume, delay=delay)
 
 
 def main() -> None:
@@ -216,12 +216,15 @@ def main() -> None:
     run_parser.add_argument("--trial-id", type=int, default=1)
     run_parser.add_argument("--resume", action="store_true", help="skip completed matching trials")
     run_parser.add_argument("--output-root", type=Path, default=RUNS_DIR)
+    run_parser.add_argument("--delay", type=float, default=0, metavar="SECONDS",
+                            help="pause between executed cases (rate limits); skipped cases do not wait")
     args = parser.parse_args()
     if args.command == "build":
         print(f"Wrote {len(build())} tasks to {TASKS_PATH}")
     else:
         summary = run(args.model, args.split, args.limit, args.ids, trial_id=args.trial_id,
-                      resume=args.resume, output_root=args.output_root, prompt_ids=args.prompt_ids)
+                      resume=args.resume, output_root=args.output_root, prompt_ids=args.prompt_ids,
+                      delay=args.delay)
         print(json.dumps(summary))
 
 

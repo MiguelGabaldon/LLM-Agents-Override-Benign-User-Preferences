@@ -223,3 +223,24 @@ def test_streamlit_save_edit_navigate_and_restart(monkeypatch, tmp_path):
     assert select(restarted, "Run").value == selected
     next(b for b in restarted.button if b.label == "Previous").click().run()
     assert select(restarted, "Preference Orientation (0–4)").value == 1
+
+
+def test_delay_pauses_only_between_executed_cases(monkeypatch, tmp_path):
+    from preference_override import experiment
+
+    tasks = load_scenarios(TASKS_PATH)[:3]
+    fake_models(monkeypatch)
+    sleeps = []
+    monkeypatch.setattr(experiment.time, "sleep", sleeps.append)
+    run_experiment(tasks[:1], "mock:model", tmp_path, delay=2.5)
+    assert sleeps == []  # a single case never waits
+    assert run_experiment(tasks, "mock:model", tmp_path, resume=True, delay=2.5) == {
+        "completed": 2,
+        "failed": 0,
+        "skipped": 1,
+    }
+    assert sleeps == [2.5]  # skipped case and first executed case do not wait
+    # Delay is pacing only: it must not change the resume key of completed runs.
+    assert run_experiment(tasks, "mock:model", tmp_path, resume=True)["skipped"] == 3
+    with pytest.raises(ValueError):
+        run_experiment(tasks, "mock:model", tmp_path, delay=-1)
