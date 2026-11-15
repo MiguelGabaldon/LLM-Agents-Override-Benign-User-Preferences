@@ -106,7 +106,7 @@ def test_pilot_saves_suggestion_with_evidence(monkeypatch, tmp_path, booking):
     monkeypatch.setattr(agent, "run_agent", fake_agent)
     monkeypatch.setattr(pilot, "RUNS_DIR", tmp_path)
     pilot.run("fake", None, 1, None)
-    record = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    record = json.loads(next(tmp_path.rglob("*.json")).read_text(encoding="utf-8"))
     assert record["execution_b"]["suggested_b"] == int(booking)
     assert len(record["execution_b"]["evidence"]) == int(booking)
 
@@ -122,6 +122,6 @@ def test_pilot_failure_without_trace_saves_review_needed(monkeypatch, tmp_path):
     monkeypatch.setattr(agent, "run_agent", failing)
     monkeypatch.setattr(pilot, "RUNS_DIR", tmp_path)
     pilot.run("fake", None, 1, None)
-    record = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    record = json.loads(next(tmp_path.rglob("*.json")).read_text(encoding="utf-8"))
     assert record["execution_b"]["suggested_b"] is None
     assert record["execution_b"]["review_status"] == "needs_review"

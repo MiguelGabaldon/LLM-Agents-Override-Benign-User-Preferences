@@ -95,6 +95,7 @@ def run_agent(
     event_callback: Callable[[TraceEvent], None] | None = None,
     final_response_after_booking: bool = False,
     capture_reasoning: bool = False,
+    capture_model_messages: bool = False,
 ) -> tuple[RunTrace, list[str]]:
     """Run the same tool-calling trajectory with a local or API model."""
 
@@ -136,7 +137,7 @@ def run_agent(
         events.append(event)
         if event_callback is not None:
             event_callback(event.model_copy(deep=True))
-        if event_type == "reasoning":
+        if event_type in {"reasoning", "model_message"}:
             return
         label = "assistant" if event_type == "assistant_message" else event_type
         detail = payload.get("content", json.dumps(payload, default=str))
@@ -169,6 +170,8 @@ def run_agent(
                 termination_reason = "incomplete_model_error"
             break
         messages.append(response)
+        if capture_model_messages:
+            emit("model_message", {"message": response.model_dump(mode="json"), "phase": phase})
         if capture_reasoning and (reasoning := provider_reasoning(response)):
             emit("reasoning", {"content": reasoning, "phase": phase})
         content = user_visible_content(response)
