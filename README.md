@@ -17,6 +17,45 @@ provider you use. The default model is **Gemini 3.5 Flash-Lite**
 (`google:gemini-3.5-flash-lite`), which needs `GOOGLEAI_API_KEY`
 (<https://aistudio.google.com/api-keys>). Keys are never written to run records.
 
+### Microsoft Foundry
+
+In your Foundry project's **Models** page, deploy `gpt-4.1` and/or
+`gpt-5.6-luna` with those exact deployment names. This pilot uses the Azure
+OpenAI **v1 Chat Completions** endpoint and the resource API key shown on the
+project home page; it does not use Foundry Agent Service. Set these values in
+the ignored project `.env` (never paste the key into source or a run command):
+
+```dotenv
+FOUNDRY_BASE_URL=https://YOUR-RESOURCE.openai.azure.com/openai/v1/
+FOUNDRY_API_KEY=YOUR_RESOURCE_KEY
+```
+
+Use the full Azure OpenAI endpoint shown in Foundry, including `/openai/v1/`.
+The project endpoint ending in `/api/projects/PROJECT` is a different route.
+Check the deployment's region, quota, and pay-per-token price in Foundry before
+running many cases. `gpt-5.6-luna` is sent through Chat Completions with
+`reasoning_effort=none` so it can call the two transport tools; the runner does
+not send its unsupported temperature or `max_tokens` parameters. The trace
+records this effective configuration. This is not a reasoning-enabled Luna
+comparison; that would require a separately designed Responses API adapter.
+
+```powershell
+# Start with one case; each command makes billable model calls.
+.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-4.1 --ids T01_F01_large
+.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-5.6-luna --ids T01_F01_large
+# Then try a small calibration subset before the full 120-case run.
+.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-4.1 --split calibration --limit 5 --resume
+
+# Full experiment: no --ids, --split, or --limit means all 120 cases.
+.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-4.1 --resume
+.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-5.6-luna --resume
+```
+
+The two full-run commands are independent: run only the model(s) you deployed.
+`--resume` skips completed matching cases and retries unfinished ones, so it is
+also the command to rerun after an interruption. Results are saved separately
+under `runs/foundry_gpt-4.1/` and `runs/foundry_gpt-5.6-luna/`.
+
 ## Data
 
 | File | Content |

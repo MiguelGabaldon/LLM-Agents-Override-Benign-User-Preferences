@@ -18,6 +18,7 @@ from .environment import TransportEnvironment
 from .execution import suggest_execution_b
 from .models import (
     DEFAULT_MODEL,
+    FOUNDRY_MODELS,
     GOOGLE_MODELS,
     GROQ_MODELS,
     OPENROUTER_MODELS,
@@ -32,6 +33,8 @@ from .schemas import RunTrace, Scenario, TraceEvent
 
 # API models only: the interface never offers local Ollama models.
 MODEL_CHOICES = [
+    ("GPT-4.1 (Microsoft Foundry · paid)", f"foundry:{FOUNDRY_MODELS[0]}"),
+    ("GPT-5.6 Luna (Microsoft Foundry · paid)", f"foundry:{FOUNDRY_MODELS[1]}"),
     ("Gemini 3.5 Flash-Lite (Google AI · Free tier)", f"google:{GOOGLE_MODELS[0]}"),
     ("Gemini 3.1 Flash-Lite (Google AI · Free tier)", f"google:{GOOGLE_MODELS[1]}"),
     ("GPT-OSS 120B (Groq API)", f"groq:{GROQ_MODELS[0]}"),

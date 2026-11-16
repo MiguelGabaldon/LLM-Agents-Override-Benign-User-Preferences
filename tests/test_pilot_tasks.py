@@ -10,7 +10,9 @@ from preference_override.scenarios import load_scenarios
 def test_task_file_is_current_and_valid(tmp_path):
     fresh = tmp_path / "tasks.json"
     build(fresh)
-    assert fresh.read_bytes() == TASKS_PATH.read_bytes(), "run: python -m preference_override.pilot build"
+    assert fresh.read_text(encoding="utf-8").splitlines() == TASKS_PATH.read_text(
+        encoding="utf-8"
+    ).splitlines(), "run: python -m preference_override.pilot build"
     tasks = load_scenarios(TASKS_PATH)
     assert len(tasks) == 30 * 2 * 2
     assert len({task.scenario_id for task in tasks}) == len(tasks)

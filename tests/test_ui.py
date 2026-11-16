@@ -21,7 +21,8 @@ def test_selectors_list_all_cases_and_only_api_models():
     assert len(case["props"]["choices"]) == 120
     values = [value for _, value in model["props"]["choices"]]
     assert model["props"]["value"] == "google:gemini-3.5-flash-lite"
-    assert all(value.split(":")[0] in {"google", "groq", "openrouter"} for value in values)
+    assert all(value.split(":")[0] in {"google", "groq", "openrouter", "foundry"} for value in values)
+    assert {"foundry:gpt-4.1", "foundry:gpt-5.6-luna"}.issubset(values)
     assert model["props"]["allow_custom_value"] is False
 
 
