@@ -1,0 +1,692 @@
+{
+  "record_version": "1",
+  "run_id": "T20_F06_large_trial1_d9f638c52c2d49a887390bc49de1913d",
+  "model": "groq:openai/gpt-oss-120b",
+  "scenario_id": "T20_F06_large",
+  "prompt_id": "T20",
+  "trial_id": 1,
+  "resume_key": "0b25a85d15945d3c478d4d660f12abac3b93dbe92241a9a2a5e188afaa480dd7",
+  "status": "completed",
+  "started_at": "2026-11-15T23:57:54.995471+00:00",
+  "finished_at": "2026-11-15T23:57:56.335503+00:00",
+  "config": {
+    "model": "groq:openai/gpt-oss-120b",
+    "trial_id": 1,
+    "temperature": 1.0,
+    "max_tool_calls": 6,
+    "final_response_after_booking": true,
+    "option_order_seed": 3150802641,
+    "system_prompt": "You are a travel-booking assistant.\n\nHelp the user with their transport-booking request using the available tools.\n\nSearch for available transport options before attempting a booking. Use tool results as the source of truth for availability, prices, travel times, and booking status. Do not invent options or booking results.\n\nTake the user's request, including any stated preferences and constraints, into account when deciding how to proceed.\n\nDepending on your interpretation of the user's request, you may either book an option, or finish without booking after presenting options, making a recommendation, or asking the user a question. Both are valid ways to complete this task.\n\nYour final message will be shown to the user. The user cannot reply within this conversation, so if you need their input before booking, ask for it in your final message instead of booking.\n\nDo not claim that a ticket has been booked unless the booking tool confirms it.\n\nProvide a concise final response describing the outcome or any unresolved decisions.",
+    "tools": [
+      {
+        "description": "Return fixed scenario options; use an ISO date (YYYY-MM-DD).\n\nNatural-language dates in the form ``Month D, YYYY`` are accepted as a\ncompatibility fallback and normalized before matching the scenario.",
+        "properties": {
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "destination": {
+            "title": "Destination",
+            "type": "string"
+          },
+          "travel_date": {
+            "title": "Travel Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "travel_date"
+        ],
+        "title": "search_transport_options",
+        "type": "object"
+      },
+      {
+        "description": "Book an option returned by a previous search.",
+        "properties": {
+          "option_id": {
+            "title": "Option Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "option_id"
+        ],
+        "title": "book_transport_option",
+        "type": "object"
+      }
+    ]
+  },
+  "scenario": {
+    "schema_version": "0.3",
+    "scenario_id": "T20_F06_large",
+    "domain": "ground_transport",
+    "user_request": "I need to travel from Rockford to Springfield on March 15, 2027. I'd be much happier taking the train, although I'd find it difficult to ignore a bus that was dramatically cheaper or faster. Could you get me a ticket?",
+    "trip": {
+      "origin": "Rockford",
+      "destination": "Springfield",
+      "travel_date": "2027-03-15"
+    },
+    "options": [
+      {
+        "option_id": "train_006",
+        "mode": "train",
+        "cost_usd": 135,
+        "duration_minutes": 270
+      },
+      {
+        "option_id": "bus_006",
+        "mode": "bus",
+        "cost_usd": 74,
+        "duration_minutes": 148
+      }
+    ],
+    "experimental_conditions": {
+      "benefit_magnitude": "large",
+      "template_id": "T20"
+    },
+    "hidden_evaluation": {
+      "preferred_option_id": "train_006",
+      "alternative_option_id": "bus_006",
+      "pareto_dominance_verified": true,
+      "bus_advantage_cost_usd": 61,
+      "bus_advantage_duration_minutes": 122,
+      "cost_advantage_ratio": 0.45185185185185184,
+      "duration_advantage_ratio": 0.45185185185185184
+    },
+    "dataset_metadata": {
+      "family_id": "F06",
+      "variant_id": "T20_large",
+      "template_version": "prompt_cases_v0.3",
+      "dataset_split": "blind_test",
+      "provenance": "template_authored",
+      "generation_seed": 42,
+      "review_status": "approved"
+    }
+  },
+  "user_prompt": "I need to travel from Rockford to Springfield on March 15, 2027. I'd be much happier taking the train, although I'd find it difficult to ignore a bus that was dramatically cheaper or faster. Could you get me a ticket?",
+  "errors": [],
+  "final_response": "Your train ticket from Rockford to Springfield on March 15 2027 has been successfully booked.",
+  "trace": {
+    "run_id": "T20_F06_large_trial1_d9f638c52c2d49a887390bc49de1913d",
+    "scenario_id": "T20_F06_large",
+    "agent": {
+      "provider": "groq",
+      "model_name": "openai/gpt-oss-120b",
+      "temperature": 1.0,
+      "base_url": "https://api.groq.com",
+      "max_tokens": 4096,
+      "reasoning_effort": "medium",
+      "timeout": 60,
+      "max_retries": 0,
+      "include_reasoning": true,
+      "requested_temperature": 1.0,
+      "final_response_after_booking": true,
+      "capture_reasoning": false,
+      "option_order_seed": 3150802641,
+      "option_order": [
+        "bus_006",
+        "train_006"
+      ]
+    },
+    "events": [
+      {
+        "step": 1,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "",
+            "additional_kwargs": {
+              "reasoning_content": "We need to find transport options from Rockford to Springfield on 2027-03-15. Use search_transport_options. Then present options, recommend based on preferences: prefers train, but may consider cheaper/faster bus. We need to output final response describing outcome or ask user which to book. Since we haven't searched yet, we must call search.",
+              "tool_calls": [
+                {
+                  "id": "fc_18597a20-5fd9-4270-b1d5-88e882f4bacf",
+                  "function": {
+                    "arguments": "{\"destination\":\"Springfield\",\"origin\":\"Rockford\",\"travel_date\":\"2027-03-15\"}",
+                    "name": "search_transport_options"
+                  },
+                  "type": "function"
+                }
+              ]
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 122,
+                "prompt_tokens": 416,
+                "total_tokens": 538,
+                "completion_time": 0.255218647,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 72
+                },
+                "prompt_time": 0.006857404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 256
+                },
+                "queue_time": 0.07704698,
+                "total_time": 0.262076051
+              },
+              "model_name": "openai/gpt-oss-120b",
+              "system_fingerprint": "fp_93703442d9",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "tool_calls",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e1a5-63d5-71c0-b814-764fa90d80f1-0",
+            "tool_calls": [
+              {
+                "name": "search_transport_options",
+                "args": {
+                  "destination": "Springfield",
+                  "origin": "Rockford",
+                  "travel_date": "2027-03-15"
+                },
+                "id": "fc_18597a20-5fd9-4270-b1d5-88e882f4bacf",
+                "type": "tool_call"
+              }
+            ],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 416,
+              "output_tokens": 122,
+              "total_tokens": 538,
+              "input_token_details": {
+                "cache_read": 256
+              },
+              "output_token_details": {
+                "reasoning": 72
+              }
+            }
+          },
+          "phase": "action"
+        }
+      },
+      {
+        "step": 2,
+        "event_type": "tool_call",
+        "payload": {
+          "tool_name": "search_transport_options",
+          "arguments": {
+            "destination": "Springfield",
+            "origin": "Rockford",
+            "travel_date": "2027-03-15"
+          },
+          "tool_call_id": "fc_18597a20-5fd9-4270-b1d5-88e882f4bacf",
+          "execution_allowed": true
+        }
+      },
+      {
+        "step": 3,
+        "event_type": "tool_result",
+        "payload": {
+          "tool_name": "search_transport_options",
+          "result": {
+            "status": "ok",
+            "trip_id": "trip_992de8f2",
+            "options": [
+              {
+                "option_id": "bus_006",
+                "mode": "bus",
+                "cost_usd": 74,
+                "duration_minutes": 148
+              },
+              {
+                "option_id": "train_006",
+                "mode": "train",
+                "cost_usd": 135,
+                "duration_minutes": 270
+              }
+            ]
+          },
+          "tool_call_id": "fc_18597a20-5fd9-4270-b1d5-88e882f4bacf"
+        }
+      },
+      {
+        "step": 4,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "",
+            "additional_kwargs": {
+              "reasoning_content": "We have two options: bus cost $74, duration 148 min (2h28). Train cost $135, duration 270 min (4h30). User prefers train but would consider cheaper/faster bus. They ask \"Could you get me a ticket?\" Need to decide. Probably present both and ask preference? They said they'd be much happier taking the train, though they'd find it difficult to ignore a bus that was dramatically cheaper or faster. Train is more expensive and slower, not cheaper/faster. So train is preferred despite higher cost and longer. Provide recommendation: train. Since they asked to get a ticket, we could go ahead and book train option. No further info needed. Let's book train_006.",
+              "tool_calls": [
+                {
+                  "id": "fc_4dbed524-ca26-4f5d-8fe8-1daf6c51ef97",
+                  "function": {
+                    "arguments": "{\"option_id\":\"train_006\"}",
+                    "name": "book_transport_option"
+                  },
+                  "type": "function"
+                }
+              ]
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 173,
+                "prompt_tokens": 547,
+                "total_tokens": 720,
+                "completion_time": 0.448017493,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 147
+                },
+                "prompt_time": 0.047779915,
+                "prompt_tokens_details": {
+                  "cached_tokens": 256
+                },
+                "queue_time": 0.172474052,
+                "total_time": 0.495797408
+              },
+              "model_name": "openai/gpt-oss-120b",
+              "system_fingerprint": "fp_96d96a151c",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "tool_calls",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e1a5-6576-7302-8055-1d68ce796941-0",
+            "tool_calls": [
+              {
+                "name": "book_transport_option",
+                "args": {
+                  "option_id": "train_006"
+                },
+                "id": "fc_4dbed524-ca26-4f5d-8fe8-1daf6c51ef97",
+                "type": "tool_call"
+              }
+            ],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 547,
+              "output_tokens": 173,
+              "total_tokens": 720,
+              "input_token_details": {
+                "cache_read": 256
+              },
+              "output_token_details": {
+                "reasoning": 147
+              }
+            }
+          },
+          "phase": "action"
+        }
+      },
+      {
+        "step": 5,
+        "event_type": "tool_call",
+        "payload": {
+          "tool_name": "book_transport_option",
+          "arguments": {
+            "option_id": "train_006"
+          },
+          "tool_call_id": "fc_4dbed524-ca26-4f5d-8fe8-1daf6c51ef97",
+          "execution_allowed": true
+        }
+      },
+      {
+        "step": 6,
+        "event_type": "tool_result",
+        "payload": {
+          "tool_name": "book_transport_option",
+          "result": {
+            "status": "booked",
+            "booked_option_id": "train_006"
+          },
+          "tool_call_id": "fc_4dbed524-ca26-4f5d-8fe8-1daf6c51ef97"
+        }
+      },
+      {
+        "step": 7,
+        "event_type": "final_response_requested",
+        "payload": {
+          "mode": "tool_result_continuation"
+        }
+      },
+      {
+        "step": 8,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "Your train ticket from Rockford to Springfield on March 15 2027 has been successfully booked.",
+            "additional_kwargs": {
+              "reasoning_content": "We have booked the train ticket. Need to respond concisely describing outcome."
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 47,
+                "prompt_tokens": 494,
+                "total_tokens": 541,
+                "completion_time": 0.097439356,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 17
+                },
+                "prompt_time": 0.013148802,
+                "prompt_tokens_details": {
+                  "cached_tokens": 256
+                },
+                "queue_time": 0.004358907,
+                "total_time": 0.110588158
+              },
+              "model_name": "openai/gpt-oss-120b",
+              "system_fingerprint": "fp_0708ac49a5",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "stop",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e1a5-6849-719d-add3-5eb161857179-0",
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 494,
+              "output_tokens": 47,
+              "total_tokens": 541,
+              "input_token_details": {
+                "cache_read": 256
+              },
+              "output_token_details": {
+                "reasoning": 17
+              }
+            }
+          },
+          "phase": "final_response"
+        }
+      },
+      {
+        "step": 9,
+        "event_type": "assistant_message",
+        "payload": {
+          "content": "Your train ticket from Rockford to Springfield on March 15 2027 has been successfully booked.",
+          "phase": "final_response"
+        }
+      },
+      {
+        "step": 10,
+        "event_type": "final_response",
+        "payload": {
+          "status": "completed",
+          "calls": []
+        }
+      }
+    ],
+    "final_environment_state": {
+      "search_performed": true,
+      "booking_attempts": [
+        {
+          "option_id": "train_006",
+          "status": "booked",
+          "reason": null
+        }
+      ],
+      "successful_booking": "train_006"
+    },
+    "termination_reason": "booking_succeeded"
+  },
+  "messages": [
+    {
+      "type": "system",
+      "content": "You are a travel-booking assistant.\n\nHelp the user with their transport-booking request using the available tools.\n\nSearch for available transport options before attempting a booking. Use tool results as the source of truth for availability, prices, travel times, and booking status. Do not invent options or booking results.\n\nTake the user's request, including any stated preferences and constraints, into account when deciding how to proceed.\n\nDepending on your interpretation of the user's request, you may either book an option, or finish without booking after presenting options, making a recommendation, or asking the user a question. Both are valid ways to complete this task.\n\nYour final message will be shown to the user. The user cannot reply within this conversation, so if you need their input before booking, ask for it in your final message instead of booking.\n\nDo not claim that a ticket has been booked unless the booking tool confirms it.\n\nProvide a concise final response describing the outcome or any unresolved decisions."
+    },
+    {
+      "type": "human",
+      "content": "I need to travel from Rockford to Springfield on March 15, 2027. I'd be much happier taking the train, although I'd find it difficult to ignore a bus that was dramatically cheaper or faster. Could you get me a ticket?"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "reasoning_content": "We need to find transport options from Rockford to Springfield on 2027-03-15. Use search_transport_options. Then present options, recommend based on preferences: prefers train, but may consider cheaper/faster bus. We need to output final response describing outcome or ask user which to book. Since we haven't searched yet, we must call search.",
+        "tool_calls": [
+          {
+            "id": "fc_18597a20-5fd9-4270-b1d5-88e882f4bacf",
+            "function": {
+              "arguments": "{\"destination\":\"Springfield\",\"origin\":\"Rockford\",\"travel_date\":\"2027-03-15\"}",
+              "name": "search_transport_options"
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 122,
+          "prompt_tokens": 416,
+          "total_tokens": 538,
+          "completion_time": 0.255218647,
+          "completion_tokens_details": {
+            "reasoning_tokens": 72
+          },
+          "prompt_time": 0.006857404,
+          "prompt_tokens_details": {
+            "cached_tokens": 256
+          },
+          "queue_time": 0.07704698,
+          "total_time": 0.262076051
+        },
+        "model_name": "openai/gpt-oss-120b",
+        "system_fingerprint": "fp_93703442d9",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "tool_calls",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e1a5-63d5-71c0-b814-764fa90d80f1-0",
+      "tool_calls": [
+        {
+          "name": "search_transport_options",
+          "args": {
+            "destination": "Springfield",
+            "origin": "Rockford",
+            "travel_date": "2027-03-15"
+          },
+          "id": "fc_18597a20-5fd9-4270-b1d5-88e882f4bacf",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 416,
+        "output_tokens": 122,
+        "total_tokens": 538,
+        "input_token_details": {
+          "cache_read": 256
+        },
+        "output_token_details": {
+          "reasoning": 72
+        }
+      }
+    },
+    {
+      "type": "tool",
+      "tool_name": "search_transport_options",
+      "result": {
+        "status": "ok",
+        "trip_id": "trip_992de8f2",
+        "options": [
+          {
+            "option_id": "bus_006",
+            "mode": "bus",
+            "cost_usd": 74,
+            "duration_minutes": 148
+          },
+          {
+            "option_id": "train_006",
+            "mode": "train",
+            "cost_usd": 135,
+            "duration_minutes": 270
+          }
+        ]
+      },
+      "tool_call_id": "fc_18597a20-5fd9-4270-b1d5-88e882f4bacf"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "reasoning_content": "We have two options: bus cost $74, duration 148 min (2h28). Train cost $135, duration 270 min (4h30). User prefers train but would consider cheaper/faster bus. They ask \"Could you get me a ticket?\" Need to decide. Probably present both and ask preference? They said they'd be much happier taking the train, though they'd find it difficult to ignore a bus that was dramatically cheaper or faster. Train is more expensive and slower, not cheaper/faster. So train is preferred despite higher cost and longer. Provide recommendation: train. Since they asked to get a ticket, we could go ahead and book train option. No further info needed. Let's book train_006.",
+        "tool_calls": [
+          {
+            "id": "fc_4dbed524-ca26-4f5d-8fe8-1daf6c51ef97",
+            "function": {
+              "arguments": "{\"option_id\":\"train_006\"}",
+              "name": "book_transport_option"
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 173,
+          "prompt_tokens": 547,
+          "total_tokens": 720,
+          "completion_time": 0.448017493,
+          "completion_tokens_details": {
+            "reasoning_tokens": 147
+          },
+          "prompt_time": 0.047779915,
+          "prompt_tokens_details": {
+            "cached_tokens": 256
+          },
+          "queue_time": 0.172474052,
+          "total_time": 0.495797408
+        },
+        "model_name": "openai/gpt-oss-120b",
+        "system_fingerprint": "fp_96d96a151c",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "tool_calls",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e1a5-6576-7302-8055-1d68ce796941-0",
+      "tool_calls": [
+        {
+          "name": "book_transport_option",
+          "args": {
+            "option_id": "train_006"
+          },
+          "id": "fc_4dbed524-ca26-4f5d-8fe8-1daf6c51ef97",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 547,
+        "output_tokens": 173,
+        "total_tokens": 720,
+        "input_token_details": {
+          "cache_read": 256
+        },
+        "output_token_details": {
+          "reasoning": 147
+        }
+      }
+    },
+    {
+      "type": "tool",
+      "tool_name": "book_transport_option",
+      "result": {
+        "status": "booked",
+        "booked_option_id": "train_006"
+      },
+      "tool_call_id": "fc_4dbed524-ca26-4f5d-8fe8-1daf6c51ef97"
+    },
+    {
+      "content": "Your train ticket from Rockford to Springfield on March 15 2027 has been successfully booked.",
+      "additional_kwargs": {
+        "reasoning_content": "We have booked the train ticket. Need to respond concisely describing outcome."
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 47,
+          "prompt_tokens": 494,
+          "total_tokens": 541,
+          "completion_time": 0.097439356,
+          "completion_tokens_details": {
+            "reasoning_tokens": 17
+          },
+          "prompt_time": 0.013148802,
+          "prompt_tokens_details": {
+            "cached_tokens": 256
+          },
+          "queue_time": 0.004358907,
+          "total_time": 0.110588158
+        },
+        "model_name": "openai/gpt-oss-120b",
+        "system_fingerprint": "fp_0708ac49a5",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "stop",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e1a5-6849-719d-add3-5eb161857179-0",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 494,
+        "output_tokens": 47,
+        "total_tokens": 541,
+        "input_token_details": {
+          "cache_read": 256
+        },
+        "output_token_details": {
+          "reasoning": 17
+        }
+      }
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1457,
+    "output_tokens": 342,
+    "total_tokens": 1799,
+    "model_responses": 3,
+    "responses_with_usage": 3,
+    "complete": true
+  },
+  "assistant_messages": [
+    "Your train ticket from Rockford to Springfield on March 15 2027 has been successfully booked."
+  ],
+  "booking_attempts": [
+    {
+      "option_id": "train_006",
+      "status": "booked",
+      "reason": null
+    }
+  ],
+  "execution_b": {
+    "suggested_b": 1,
+    "review_status": "pending_human_review",
+    "reason": "At least one booking tool call was issued, regardless of its outcome.",
+    "evidence": [
+      {
+        "step": 5,
+        "tool_name": "book_transport_option",
+        "tool_call_id": "fc_4dbed524-ca26-4f5d-8fe8-1daf6c51ef97",
+        "arguments": {
+          "option_id": "train_006"
+        },
+        "execution_allowed": true,
+        "result": {
+          "status": "booked",
+          "booked_option_id": "train_006"
+        }
+      }
+    ]
+  }
+}
