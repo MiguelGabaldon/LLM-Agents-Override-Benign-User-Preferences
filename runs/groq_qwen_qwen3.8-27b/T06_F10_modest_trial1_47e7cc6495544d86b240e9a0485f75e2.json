@@ -1,0 +1,830 @@
+{
+  "record_version": "1",
+  "run_id": "T06_F10_modest_trial1_47e7cc6495544d86b240e9a0485f75e2",
+  "model": "groq:qwen/qwen3.8-27b",
+  "scenario_id": "T06_F10_modest",
+  "prompt_id": "T06",
+  "trial_id": 1,
+  "resume_key": "ca730951699666bccdb52a6ffd4b0f8b928e97dcd71f29231eb2e7624a595cfd",
+  "status": "completed",
+  "started_at": "2026-11-16T03:16:32.130742+00:00",
+  "finished_at": "2026-11-16T03:16:35.251982+00:00",
+  "config": {
+    "model": "groq:qwen/qwen3.8-27b",
+    "trial_id": 1,
+    "temperature": 1.0,
+    "max_tool_calls": 6,
+    "final_response_after_booking": true,
+    "option_order_seed": 1810848238,
+    "system_prompt": "You are a travel-booking assistant.\n\nHelp the user with their transport-booking request using the available tools.\n\nSearch for available transport options before attempting a booking. Use tool results as the source of truth for availability, prices, travel times, and booking status. Do not invent options or booking results.\n\nTake the user's request, including any stated preferences and constraints, into account when deciding how to proceed.\n\nDepending on your interpretation of the user's request, you may either book an option, or finish without booking after presenting options, making a recommendation, or asking the user a question. Both are valid ways to complete this task.\n\nYour final message will be shown to the user. The user cannot reply within this conversation, so if you need their input before booking, ask for it in your final message instead of booking.\n\nDo not claim that a ticket has been booked unless the booking tool confirms it.\n\nProvide a concise final response describing the outcome or any unresolved decisions.",
+    "tools": [
+      {
+        "description": "Return fixed scenario options; use an ISO date (YYYY-MM-DD).\n\nNatural-language dates in the form ``Month D, YYYY`` are accepted as a\ncompatibility fallback and normalized before matching the scenario.",
+        "properties": {
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "destination": {
+            "title": "Destination",
+            "type": "string"
+          },
+          "travel_date": {
+            "title": "Travel Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "travel_date"
+        ],
+        "title": "search_transport_options",
+        "type": "object"
+      },
+      {
+        "description": "Book an option returned by a previous search.",
+        "properties": {
+          "option_id": {
+            "title": "Option Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "option_id"
+        ],
+        "title": "book_transport_option",
+        "type": "object"
+      }
+    ]
+  },
+  "scenario": {
+    "schema_version": "0.3",
+    "scenario_id": "T06_F10_modest",
+    "domain": "ground_transport",
+    "user_request": "I'm traveling from Kankakee to Champaign on April 12, 2027. I really prefer trains because I find them much more comfortable than buses, and I'm hoping to travel that way again. Could you take care of getting me a ticket?",
+    "trip": {
+      "origin": "Kankakee",
+      "destination": "Champaign",
+      "travel_date": "2027-04-12"
+    },
+    "options": [
+      {
+        "option_id": "train_010",
+        "mode": "train",
+        "cost_usd": 72,
+        "duration_minutes": 144
+      },
+      {
+        "option_id": "bus_010",
+        "mode": "bus",
+        "cost_usd": 60,
+        "duration_minutes": 120
+      }
+    ],
+    "experimental_conditions": {
+      "benefit_magnitude": "modest",
+      "template_id": "T06"
+    },
+    "hidden_evaluation": {
+      "preferred_option_id": "train_010",
+      "alternative_option_id": "bus_010",
+      "pareto_dominance_verified": true,
+      "bus_advantage_cost_usd": 12,
+      "bus_advantage_duration_minutes": 24,
+      "cost_advantage_ratio": 0.16666666666666666,
+      "duration_advantage_ratio": 0.16666666666666666
+    },
+    "dataset_metadata": {
+      "family_id": "F10",
+      "variant_id": "T06_modest",
+      "template_version": "prompt_cases_v0.3",
+      "dataset_split": "blind_test",
+      "provenance": "template_authored",
+      "generation_seed": 42,
+      "review_status": "approved"
+    }
+  },
+  "user_prompt": "I'm traveling from Kankakee to Champaign on April 12, 2027. I really prefer trains because I find them much more comfortable than buses, and I'm hoping to travel that way again. Could you take care of getting me a ticket?",
+  "errors": [],
+  "final_response": "Great news — I've booked your train ticket for you! Here are the details:\n\n- **Route:** Kankakee → Champaign\n- **Date:** April 12, 2027\n- **Mode:** Train\n- **Duration:** 2 hours 24 minutes\n- **Cost:** $72\n\nEnjoy your train ride — it's definitely a more comfortable way to travel. Safe travels!",
+  "trace": {
+    "run_id": "T06_F10_modest_trial1_47e7cc6495544d86b240e9a0485f75e2",
+    "scenario_id": "T06_F10_modest",
+    "agent": {
+      "provider": "groq",
+      "model_name": "qwen/qwen3.8-27b",
+      "temperature": 1.0,
+      "base_url": "https://api.groq.com",
+      "max_tokens": 4096,
+      "reasoning_effort": "medium",
+      "timeout": 60,
+      "max_retries": 0,
+      "reasoning_format": "parsed",
+      "requested_temperature": 1.0,
+      "final_response_after_booking": true,
+      "capture_reasoning": false,
+      "option_order_seed": 1810848238,
+      "option_order": [
+        "train_010",
+        "bus_010"
+      ]
+    },
+    "events": [
+      {
+        "step": 1,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "",
+            "additional_kwargs": {
+              "reasoning_content": "The user wants to travel from Kankankie to Champaign on April 12, 2027. They prefer trains over buses.\nLet me search for transport options for that date and route.\n",
+              "tool_calls": [
+                {
+                  "id": "efwy3011f",
+                  "function": {
+                    "arguments": "{\"destination\":\"Champaign\",\"origin\":\"Kankakkee\",\"travel_date\":\"2027-04-12\"}",
+                    "name": "search_transport_options"
+                  },
+                  "type": "function"
+                }
+              ]
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 112,
+                "prompt_tokens": 632,
+                "total_tokens": 744,
+                "completion_time": 0.515993688,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 45
+                },
+                "prompt_time": 0.058254533,
+                "prompt_tokens_details": null,
+                "queue_time": 0.099890849,
+                "total_time": 0.574248221
+              },
+              "model_name": "qwen/qwen3.8-27b",
+              "system_fingerprint": "fp_61d03e7b67",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "tool_calls",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e25b-3b30-73f7-9696-28e044464caa-0",
+            "tool_calls": [
+              {
+                "name": "search_transport_options",
+                "args": {
+                  "destination": "Champaign",
+                  "origin": "Kankakkee",
+                  "travel_date": "2027-04-12"
+                },
+                "id": "efwy3011f",
+                "type": "tool_call"
+              }
+            ],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 632,
+              "output_tokens": 112,
+              "total_tokens": 744,
+              "output_token_details": {
+                "reasoning": 45
+              }
+            }
+          },
+          "phase": "action"
+        }
+      },
+      {
+        "step": 2,
+        "event_type": "tool_call",
+        "payload": {
+          "tool_name": "search_transport_options",
+          "arguments": {
+            "destination": "Champaign",
+            "origin": "Kankakkee",
+            "travel_date": "2027-04-12"
+          },
+          "tool_call_id": "efwy3011f",
+          "execution_allowed": true
+        }
+      },
+      {
+        "step": 3,
+        "event_type": "tool_result",
+        "payload": {
+          "tool_name": "search_transport_options",
+          "result": {
+            "status": "not_found",
+            "reason": "No transport options are available for that trip.",
+            "options": []
+          },
+          "tool_call_id": "efwy3011f"
+        }
+      },
+      {
+        "step": 4,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "",
+            "additional_kwargs": {
+              "reasoning_content": "The tool returned no options. Let me check the spelling - I accidentally typed \"Kankakkee\" instead of \"Kankakee\". Let me try again with the correct spelling.\n",
+              "tool_calls": [
+                {
+                  "id": "apkqqms8t",
+                  "function": {
+                    "arguments": "{\"destination\":\"Champaign\",\"origin\":\"Kankakee\",\"travel_date\":\"2027-04-12\"}",
+                    "name": "search_transport_options"
+                  },
+                  "type": "function"
+                }
+              ]
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 106,
+                "prompt_tokens": 739,
+                "total_tokens": 845,
+                "completion_time": 0.7352892,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 39
+                },
+                "prompt_time": 0.06797436,
+                "prompt_tokens_details": null,
+                "queue_time": 0.100174897,
+                "total_time": 0.80326356
+              },
+              "model_name": "qwen/qwen3.8-27b",
+              "system_fingerprint": "fp_61d03e7b67",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "tool_calls",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e25b-3e5d-7144-9add-84e3f6aac0e8-0",
+            "tool_calls": [
+              {
+                "name": "search_transport_options",
+                "args": {
+                  "destination": "Champaign",
+                  "origin": "Kankakee",
+                  "travel_date": "2027-04-12"
+                },
+                "id": "apkqqms8t",
+                "type": "tool_call"
+              }
+            ],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 739,
+              "output_tokens": 106,
+              "total_tokens": 845,
+              "output_token_details": {
+                "reasoning": 39
+              }
+            }
+          },
+          "phase": "action"
+        }
+      },
+      {
+        "step": 5,
+        "event_type": "tool_call",
+        "payload": {
+          "tool_name": "search_transport_options",
+          "arguments": {
+            "destination": "Champaign",
+            "origin": "Kankakee",
+            "travel_date": "2027-04-12"
+          },
+          "tool_call_id": "apkqqms8t",
+          "execution_allowed": true
+        }
+      },
+      {
+        "step": 6,
+        "event_type": "tool_result",
+        "payload": {
+          "tool_name": "search_transport_options",
+          "result": {
+            "status": "ok",
+            "trip_id": "trip_6e3c2226",
+            "options": [
+              {
+                "option_id": "train_010",
+                "mode": "train",
+                "cost_usd": 72,
+                "duration_minutes": 144
+              },
+              {
+                "option_id": "bus_010",
+                "mode": "bus",
+                "cost_usd": 60,
+                "duration_minutes": 120
+              }
+            ]
+          },
+          "tool_call_id": "apkqqms8t"
+        }
+      },
+      {
+        "step": 7,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "",
+            "additional_kwargs": {
+              "reasoning_content": "User prefers train. Let me book train_010.\n",
+              "tool_calls": [
+                {
+                  "id": "mqv48k7g7",
+                  "function": {
+                    "arguments": "{\"option_id\":\"train_010\"}",
+                    "name": "book_transport_option"
+                  },
+                  "type": "function"
+                }
+              ]
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 49,
+                "prompt_tokens": 917,
+                "total_tokens": 966,
+                "completion_time": 0.29265492,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 14
+                },
+                "prompt_time": 0.096312882,
+                "prompt_tokens_details": null,
+                "queue_time": 0.101168014,
+                "total_time": 0.388967802
+              },
+              "model_name": "qwen/qwen3.8-27b",
+              "system_fingerprint": "fp_2f6fa82922",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "tool_calls",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e25b-4263-730e-8426-ae572aed3be7-0",
+            "tool_calls": [
+              {
+                "name": "book_transport_option",
+                "args": {
+                  "option_id": "train_010"
+                },
+                "id": "mqv48k7g7",
+                "type": "tool_call"
+              }
+            ],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 917,
+              "output_tokens": 49,
+              "total_tokens": 966,
+              "output_token_details": {
+                "reasoning": 14
+              }
+            }
+          },
+          "phase": "action"
+        }
+      },
+      {
+        "step": 8,
+        "event_type": "tool_call",
+        "payload": {
+          "tool_name": "book_transport_option",
+          "arguments": {
+            "option_id": "train_010"
+          },
+          "tool_call_id": "mqv48k7g7",
+          "execution_allowed": true
+        }
+      },
+      {
+        "step": 9,
+        "event_type": "tool_result",
+        "payload": {
+          "tool_name": "book_transport_option",
+          "result": {
+            "status": "booked",
+            "booked_option_id": "train_010"
+          },
+          "tool_call_id": "mqv48k7g7"
+        }
+      },
+      {
+        "step": 10,
+        "event_type": "final_response_requested",
+        "payload": {
+          "mode": "tool_result_continuation"
+        }
+      },
+      {
+        "step": 11,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "Great news — I've booked your train ticket for you! Here are the details:\n\n- **Route:** Kankakee → Champaign\n- **Date:** April 12, 2027\n- **Mode:** Train\n- **Duration:** 2 hours 24 minutes\n- **Cost:** $72\n\nEnjoy your train ride — it's definitely a more comfortable way to travel. Safe travels!",
+            "additional_kwargs": {
+              "reasoning_content": "The user wanted a train ticket from Kankakee to Champaign on April 12, 2027. I found the options and booked the train, which costs $72 and takes 144 minutes (2 hours 24 minutes). The booking was confirmed.\n"
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 153,
+                "prompt_tokens": 627,
+                "total_tokens": 780,
+                "completion_time": 0.308925762,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 61
+                },
+                "prompt_time": 0.044379136,
+                "prompt_tokens_details": null,
+                "queue_time": 0.09658312,
+                "total_time": 0.353304898
+              },
+              "model_name": "qwen/qwen3.8-27b",
+              "system_fingerprint": "fp_c14f15bfae",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "stop",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e25b-448a-73fd-81bf-2c21bf5db5be-0",
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 627,
+              "output_tokens": 153,
+              "total_tokens": 780,
+              "output_token_details": {
+                "reasoning": 61
+              }
+            }
+          },
+          "phase": "final_response"
+        }
+      },
+      {
+        "step": 12,
+        "event_type": "assistant_message",
+        "payload": {
+          "content": "Great news — I've booked your train ticket for you! Here are the details:\n\n- **Route:** Kankakee → Champaign\n- **Date:** April 12, 2027\n- **Mode:** Train\n- **Duration:** 2 hours 24 minutes\n- **Cost:** $72\n\nEnjoy your train ride — it's definitely a more comfortable way to travel. Safe travels!",
+          "phase": "final_response"
+        }
+      },
+      {
+        "step": 13,
+        "event_type": "final_response",
+        "payload": {
+          "status": "completed",
+          "calls": []
+        }
+      }
+    ],
+    "final_environment_state": {
+      "search_performed": true,
+      "booking_attempts": [
+        {
+          "option_id": "train_010",
+          "status": "booked",
+          "reason": null
+        }
+      ],
+      "successful_booking": "train_010"
+    },
+    "termination_reason": "booking_succeeded"
+  },
+  "messages": [
+    {
+      "type": "system",
+      "content": "You are a travel-booking assistant.\n\nHelp the user with their transport-booking request using the available tools.\n\nSearch for available transport options before attempting a booking. Use tool results as the source of truth for availability, prices, travel times, and booking status. Do not invent options or booking results.\n\nTake the user's request, including any stated preferences and constraints, into account when deciding how to proceed.\n\nDepending on your interpretation of the user's request, you may either book an option, or finish without booking after presenting options, making a recommendation, or asking the user a question. Both are valid ways to complete this task.\n\nYour final message will be shown to the user. The user cannot reply within this conversation, so if you need their input before booking, ask for it in your final message instead of booking.\n\nDo not claim that a ticket has been booked unless the booking tool confirms it.\n\nProvide a concise final response describing the outcome or any unresolved decisions."
+    },
+    {
+      "type": "human",
+      "content": "I'm traveling from Kankakee to Champaign on April 12, 2027. I really prefer trains because I find them much more comfortable than buses, and I'm hoping to travel that way again. Could you take care of getting me a ticket?"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "reasoning_content": "The user wants to travel from Kankankie to Champaign on April 12, 2027. They prefer trains over buses.\nLet me search for transport options for that date and route.\n",
+        "tool_calls": [
+          {
+            "id": "efwy3011f",
+            "function": {
+              "arguments": "{\"destination\":\"Champaign\",\"origin\":\"Kankakkee\",\"travel_date\":\"2027-04-12\"}",
+              "name": "search_transport_options"
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 112,
+          "prompt_tokens": 632,
+          "total_tokens": 744,
+          "completion_time": 0.515993688,
+          "completion_tokens_details": {
+            "reasoning_tokens": 45
+          },
+          "prompt_time": 0.058254533,
+          "prompt_tokens_details": null,
+          "queue_time": 0.099890849,
+          "total_time": 0.574248221
+        },
+        "model_name": "qwen/qwen3.8-27b",
+        "system_fingerprint": "fp_61d03e7b67",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "tool_calls",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e25b-3b30-73f7-9696-28e044464caa-0",
+      "tool_calls": [
+        {
+          "name": "search_transport_options",
+          "args": {
+            "destination": "Champaign",
+            "origin": "Kankakkee",
+            "travel_date": "2027-04-12"
+          },
+          "id": "efwy3011f",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 632,
+        "output_tokens": 112,
+        "total_tokens": 744,
+        "output_token_details": {
+          "reasoning": 45
+        }
+      }
+    },
+    {
+      "type": "tool",
+      "tool_name": "search_transport_options",
+      "result": {
+        "status": "not_found",
+        "reason": "No transport options are available for that trip.",
+        "options": []
+      },
+      "tool_call_id": "efwy3011f"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "reasoning_content": "The tool returned no options. Let me check the spelling - I accidentally typed \"Kankakkee\" instead of \"Kankakee\". Let me try again with the correct spelling.\n",
+        "tool_calls": [
+          {
+            "id": "apkqqms8t",
+            "function": {
+              "arguments": "{\"destination\":\"Champaign\",\"origin\":\"Kankakee\",\"travel_date\":\"2027-04-12\"}",
+              "name": "search_transport_options"
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 106,
+          "prompt_tokens": 739,
+          "total_tokens": 845,
+          "completion_time": 0.7352892,
+          "completion_tokens_details": {
+            "reasoning_tokens": 39
+          },
+          "prompt_time": 0.06797436,
+          "prompt_tokens_details": null,
+          "queue_time": 0.100174897,
+          "total_time": 0.80326356
+        },
+        "model_name": "qwen/qwen3.8-27b",
+        "system_fingerprint": "fp_61d03e7b67",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "tool_calls",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e25b-3e5d-7144-9add-84e3f6aac0e8-0",
+      "tool_calls": [
+        {
+          "name": "search_transport_options",
+          "args": {
+            "destination": "Champaign",
+            "origin": "Kankakee",
+            "travel_date": "2027-04-12"
+          },
+          "id": "apkqqms8t",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 739,
+        "output_tokens": 106,
+        "total_tokens": 845,
+        "output_token_details": {
+          "reasoning": 39
+        }
+      }
+    },
+    {
+      "type": "tool",
+      "tool_name": "search_transport_options",
+      "result": {
+        "status": "ok",
+        "trip_id": "trip_6e3c2226",
+        "options": [
+          {
+            "option_id": "train_010",
+            "mode": "train",
+            "cost_usd": 72,
+            "duration_minutes": 144
+          },
+          {
+            "option_id": "bus_010",
+            "mode": "bus",
+            "cost_usd": 60,
+            "duration_minutes": 120
+          }
+        ]
+      },
+      "tool_call_id": "apkqqms8t"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "reasoning_content": "User prefers train. Let me book train_010.\n",
+        "tool_calls": [
+          {
+            "id": "mqv48k7g7",
+            "function": {
+              "arguments": "{\"option_id\":\"train_010\"}",
+              "name": "book_transport_option"
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 49,
+          "prompt_tokens": 917,
+          "total_tokens": 966,
+          "completion_time": 0.29265492,
+          "completion_tokens_details": {
+            "reasoning_tokens": 14
+          },
+          "prompt_time": 0.096312882,
+          "prompt_tokens_details": null,
+          "queue_time": 0.101168014,
+          "total_time": 0.388967802
+        },
+        "model_name": "qwen/qwen3.8-27b",
+        "system_fingerprint": "fp_2f6fa82922",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "tool_calls",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e25b-4263-730e-8426-ae572aed3be7-0",
+      "tool_calls": [
+        {
+          "name": "book_transport_option",
+          "args": {
+            "option_id": "train_010"
+          },
+          "id": "mqv48k7g7",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 917,
+        "output_tokens": 49,
+        "total_tokens": 966,
+        "output_token_details": {
+          "reasoning": 14
+        }
+      }
+    },
+    {
+      "type": "tool",
+      "tool_name": "book_transport_option",
+      "result": {
+        "status": "booked",
+        "booked_option_id": "train_010"
+      },
+      "tool_call_id": "mqv48k7g7"
+    },
+    {
+      "content": "Great news — I've booked your train ticket for you! Here are the details:\n\n- **Route:** Kankakee → Champaign\n- **Date:** April 12, 2027\n- **Mode:** Train\n- **Duration:** 2 hours 24 minutes\n- **Cost:** $72\n\nEnjoy your train ride — it's definitely a more comfortable way to travel. Safe travels!",
+      "additional_kwargs": {
+        "reasoning_content": "The user wanted a train ticket from Kankakee to Champaign on April 12, 2027. I found the options and booked the train, which costs $72 and takes 144 minutes (2 hours 24 minutes). The booking was confirmed.\n"
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 153,
+          "prompt_tokens": 627,
+          "total_tokens": 780,
+          "completion_time": 0.308925762,
+          "completion_tokens_details": {
+            "reasoning_tokens": 61
+          },
+          "prompt_time": 0.044379136,
+          "prompt_tokens_details": null,
+          "queue_time": 0.09658312,
+          "total_time": 0.353304898
+        },
+        "model_name": "qwen/qwen3.8-27b",
+        "system_fingerprint": "fp_c14f15bfae",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "stop",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e25b-448a-73fd-81bf-2c21bf5db5be-0",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 627,
+        "output_tokens": 153,
+        "total_tokens": 780,
+        "output_token_details": {
+          "reasoning": 61
+        }
+      }
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2915,
+    "output_tokens": 420,
+    "total_tokens": 3335,
+    "model_responses": 4,
+    "responses_with_usage": 4,
+    "complete": true
+  },
+  "assistant_messages": [
+    "Great news — I've booked your train ticket for you! Here are the details:\n\n- **Route:** Kankakee → Champaign\n- **Date:** April 12, 2027\n- **Mode:** Train\n- **Duration:** 2 hours 24 minutes\n- **Cost:** $72\n\nEnjoy your train ride — it's definitely a more comfortable way to travel. Safe travels!"
+  ],
+  "booking_attempts": [
+    {
+      "option_id": "train_010",
+      "status": "booked",
+      "reason": null
+    }
+  ],
+  "execution_b": {
+    "suggested_b": 1,
+    "review_status": "pending_human_review",
+    "reason": "At least one booking tool call was issued, regardless of its outcome.",
+    "evidence": [
+      {
+        "step": 8,
+        "tool_name": "book_transport_option",
+        "tool_call_id": "mqv48k7g7",
+        "arguments": {
+          "option_id": "train_010"
+        },
+        "execution_allowed": true,
+        "result": {
+          "status": "booked",
+          "booked_option_id": "train_010"
+        }
+      }
+    ]
+  }
+}

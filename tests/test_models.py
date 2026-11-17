@@ -57,12 +57,12 @@ def test_local_model_needs_no_credentials_and_retains_settings(isolated_credenti
     adapter, metadata = models.create_model("qwen3:4b")
     assert adapter.model == "qwen3:4b"
     assert adapter.reasoning is True
-    assert adapter.temperature == 0
+    assert adapter.temperature == models.DEFAULT_TEMPERATURE == 1.0
     assert adapter.base_url == "http://localhost:11434"
     assert metadata == {
         "provider": "ollama",
         "model_name": "qwen3:4b",
-        "temperature": 0,
+        "temperature": 1.0,
         "base_url": "http://localhost:11434",
     }
     assert models.resolve_model("custom/model:tag") == ("ollama", "custom/model:tag")
@@ -151,8 +151,8 @@ def test_groq_tool_round_trip_and_safe_trace(mock_groq, selection):
     assert visible == []
     assert trace.agent["provider"] == "groq"
     assert trace.agent["model_name"] == selection.removeprefix("groq:")
-    assert trace.agent["temperature"] == requests[0]["temperature"]
-    assert trace.agent["requested_temperature"] == 0
+    assert trace.agent["temperature"] == requests[0]["temperature"] == 1.0
+    assert trace.agent["requested_temperature"] == 1.0
     assert requests[0]["model"] == trace.agent["model_name"]
     assert requests[0]["reasoning_effort"] == "medium"
     if selection.startswith("groq:qwen/"):

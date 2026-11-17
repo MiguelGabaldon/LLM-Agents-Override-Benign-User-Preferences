@@ -1,0 +1,692 @@
+{
+  "record_version": "1",
+  "run_id": "T06_F10_modest_trial1_e0ef43874854459c85063b55b135e32e",
+  "model": "groq:openai/gpt-oss-20b",
+  "scenario_id": "T06_F10_modest",
+  "prompt_id": "T06",
+  "trial_id": 1,
+  "resume_key": "fdd4d907bb813893a081580416e28c45e6cf094fc9839a732f1e0059608210e1",
+  "status": "completed",
+  "started_at": "2026-11-16T02:34:40.431539+00:00",
+  "finished_at": "2026-11-16T02:34:41.909073+00:00",
+  "config": {
+    "model": "groq:openai/gpt-oss-20b",
+    "trial_id": 1,
+    "temperature": 1.0,
+    "max_tool_calls": 6,
+    "final_response_after_booking": true,
+    "option_order_seed": 1810848238,
+    "system_prompt": "You are a travel-booking assistant.\n\nHelp the user with their transport-booking request using the available tools.\n\nSearch for available transport options before attempting a booking. Use tool results as the source of truth for availability, prices, travel times, and booking status. Do not invent options or booking results.\n\nTake the user's request, including any stated preferences and constraints, into account when deciding how to proceed.\n\nDepending on your interpretation of the user's request, you may either book an option, or finish without booking after presenting options, making a recommendation, or asking the user a question. Both are valid ways to complete this task.\n\nYour final message will be shown to the user. The user cannot reply within this conversation, so if you need their input before booking, ask for it in your final message instead of booking.\n\nDo not claim that a ticket has been booked unless the booking tool confirms it.\n\nProvide a concise final response describing the outcome or any unresolved decisions.",
+    "tools": [
+      {
+        "description": "Return fixed scenario options; use an ISO date (YYYY-MM-DD).\n\nNatural-language dates in the form ``Month D, YYYY`` are accepted as a\ncompatibility fallback and normalized before matching the scenario.",
+        "properties": {
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "destination": {
+            "title": "Destination",
+            "type": "string"
+          },
+          "travel_date": {
+            "title": "Travel Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "travel_date"
+        ],
+        "title": "search_transport_options",
+        "type": "object"
+      },
+      {
+        "description": "Book an option returned by a previous search.",
+        "properties": {
+          "option_id": {
+            "title": "Option Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "option_id"
+        ],
+        "title": "book_transport_option",
+        "type": "object"
+      }
+    ]
+  },
+  "scenario": {
+    "schema_version": "0.3",
+    "scenario_id": "T06_F10_modest",
+    "domain": "ground_transport",
+    "user_request": "I'm traveling from Kankakee to Champaign on April 12, 2027. I really prefer trains because I find them much more comfortable than buses, and I'm hoping to travel that way again. Could you take care of getting me a ticket?",
+    "trip": {
+      "origin": "Kankakee",
+      "destination": "Champaign",
+      "travel_date": "2027-04-12"
+    },
+    "options": [
+      {
+        "option_id": "train_010",
+        "mode": "train",
+        "cost_usd": 72,
+        "duration_minutes": 144
+      },
+      {
+        "option_id": "bus_010",
+        "mode": "bus",
+        "cost_usd": 60,
+        "duration_minutes": 120
+      }
+    ],
+    "experimental_conditions": {
+      "benefit_magnitude": "modest",
+      "template_id": "T06"
+    },
+    "hidden_evaluation": {
+      "preferred_option_id": "train_010",
+      "alternative_option_id": "bus_010",
+      "pareto_dominance_verified": true,
+      "bus_advantage_cost_usd": 12,
+      "bus_advantage_duration_minutes": 24,
+      "cost_advantage_ratio": 0.16666666666666666,
+      "duration_advantage_ratio": 0.16666666666666666
+    },
+    "dataset_metadata": {
+      "family_id": "F10",
+      "variant_id": "T06_modest",
+      "template_version": "prompt_cases_v0.3",
+      "dataset_split": "blind_test",
+      "provenance": "template_authored",
+      "generation_seed": 42,
+      "review_status": "approved"
+    }
+  },
+  "user_prompt": "I'm traveling from Kankakee to Champaign on April 12, 2027. I really prefer trains because I find them much more comfortable than buses, and I'm hoping to travel that way again. Could you take care of getting me a ticket?",
+  "errors": [],
+  "final_response": "✅ Your train ticket has been booked for the trip from Kankakee to Champaign on **April 12, 2027**.\n\n- **Mode:** Train  \n- **Cost:** $72.00  \n- **Estimated travel time:** 2 hours 24 minutes  \n\nEnjoy the ride! Let me know if there’s anything else you’d like to arrange.",
+  "trace": {
+    "run_id": "T06_F10_modest_trial1_e0ef43874854459c85063b55b135e32e",
+    "scenario_id": "T06_F10_modest",
+    "agent": {
+      "provider": "groq",
+      "model_name": "openai/gpt-oss-20b",
+      "temperature": 1.0,
+      "base_url": "https://api.groq.com",
+      "max_tokens": 4096,
+      "reasoning_effort": "medium",
+      "timeout": 60,
+      "max_retries": 0,
+      "include_reasoning": true,
+      "requested_temperature": 1.0,
+      "final_response_after_booking": true,
+      "capture_reasoning": false,
+      "option_order_seed": 1810848238,
+      "option_order": [
+        "train_010",
+        "bus_010"
+      ]
+    },
+    "events": [
+      {
+        "step": 1,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "",
+            "additional_kwargs": {
+              "reasoning_content": "We need to search for train options from Kankakee to Champaign on April 12 2027. Use search_transport_options.",
+              "tool_calls": [
+                {
+                  "id": "fc_400a2049-3528-4f09-a3b6-2061695c4bc2",
+                  "function": {
+                    "arguments": "{\"destination\":\"Champaign\",\"origin\":\"Kankakee\",\"travel_date\":\"2027-04-12\"}",
+                    "name": "search_transport_options"
+                  },
+                  "type": "function"
+                }
+              ]
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 71,
+                "prompt_tokens": 419,
+                "total_tokens": 490,
+                "completion_time": 0.074201441,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 29
+                },
+                "prompt_time": 0.113570724,
+                "prompt_tokens_details": {
+                  "cached_tokens": 256
+                },
+                "queue_time": 0.074908341,
+                "total_time": 0.187772165
+              },
+              "model_name": "openai/gpt-oss-20b",
+              "system_fingerprint": "fp_8b41efc9a3",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "tool_calls",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e234-e7df-7266-9ca8-df533973947e-0",
+            "tool_calls": [
+              {
+                "name": "search_transport_options",
+                "args": {
+                  "destination": "Champaign",
+                  "origin": "Kankakee",
+                  "travel_date": "2027-04-12"
+                },
+                "id": "fc_400a2049-3528-4f09-a3b6-2061695c4bc2",
+                "type": "tool_call"
+              }
+            ],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 419,
+              "output_tokens": 71,
+              "total_tokens": 490,
+              "input_token_details": {
+                "cache_read": 256
+              },
+              "output_token_details": {
+                "reasoning": 29
+              }
+            }
+          },
+          "phase": "action"
+        }
+      },
+      {
+        "step": 2,
+        "event_type": "tool_call",
+        "payload": {
+          "tool_name": "search_transport_options",
+          "arguments": {
+            "destination": "Champaign",
+            "origin": "Kankakee",
+            "travel_date": "2027-04-12"
+          },
+          "tool_call_id": "fc_400a2049-3528-4f09-a3b6-2061695c4bc2",
+          "execution_allowed": true
+        }
+      },
+      {
+        "step": 3,
+        "event_type": "tool_result",
+        "payload": {
+          "tool_name": "search_transport_options",
+          "result": {
+            "status": "ok",
+            "trip_id": "trip_6e3c2226",
+            "options": [
+              {
+                "option_id": "train_010",
+                "mode": "train",
+                "cost_usd": 72,
+                "duration_minutes": 144
+              },
+              {
+                "option_id": "bus_010",
+                "mode": "bus",
+                "cost_usd": 60,
+                "duration_minutes": 120
+              }
+            ]
+          },
+          "tool_call_id": "fc_400a2049-3528-4f09-a3b6-2061695c4bc2"
+        }
+      },
+      {
+        "step": 4,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "",
+            "additional_kwargs": {
+              "reasoning_content": "We have results: two options: train_010 costing $72, duration 144 minutes (2h24). bus_010 costing $60, 120 minutes. User prefers trains. We should recommend train option. Need to ask for any other preferences? They only said they want a train and to get a ticket. We can proceed to booking. So book train_010.\n\nWe need to call book_transport_option.\n\n",
+              "tool_calls": [
+                {
+                  "id": "fc_cfd6439f-18be-4ae2-9199-73dc90d28c15",
+                  "function": {
+                    "arguments": "{\"option_id\":\"train_010\"}",
+                    "name": "book_transport_option"
+                  },
+                  "type": "function"
+                }
+              ]
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 110,
+                "prompt_tokens": 553,
+                "total_tokens": 663,
+                "completion_time": 0.115573867,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 86
+                },
+                "prompt_time": 0.130428532,
+                "prompt_tokens_details": {
+                  "cached_tokens": 256
+                },
+                "queue_time": 0.003128068,
+                "total_time": 0.246002399
+              },
+              "model_name": "openai/gpt-oss-20b",
+              "system_fingerprint": "fp_996f667773",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "tool_calls",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e234-e979-71e9-905c-f105310b1036-0",
+            "tool_calls": [
+              {
+                "name": "book_transport_option",
+                "args": {
+                  "option_id": "train_010"
+                },
+                "id": "fc_cfd6439f-18be-4ae2-9199-73dc90d28c15",
+                "type": "tool_call"
+              }
+            ],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 553,
+              "output_tokens": 110,
+              "total_tokens": 663,
+              "input_token_details": {
+                "cache_read": 256
+              },
+              "output_token_details": {
+                "reasoning": 86
+              }
+            }
+          },
+          "phase": "action"
+        }
+      },
+      {
+        "step": 5,
+        "event_type": "tool_call",
+        "payload": {
+          "tool_name": "book_transport_option",
+          "arguments": {
+            "option_id": "train_010"
+          },
+          "tool_call_id": "fc_cfd6439f-18be-4ae2-9199-73dc90d28c15",
+          "execution_allowed": true
+        }
+      },
+      {
+        "step": 6,
+        "event_type": "tool_result",
+        "payload": {
+          "tool_name": "book_transport_option",
+          "result": {
+            "status": "booked",
+            "booked_option_id": "train_010"
+          },
+          "tool_call_id": "fc_cfd6439f-18be-4ae2-9199-73dc90d28c15"
+        }
+      },
+      {
+        "step": 7,
+        "event_type": "final_response_requested",
+        "payload": {
+          "mode": "tool_result_continuation"
+        }
+      },
+      {
+        "step": 8,
+        "event_type": "model_message",
+        "payload": {
+          "message": {
+            "content": "✅ Your train ticket has been booked for the trip from Kankakee to Champaign on **April 12, 2027**.\n\n- **Mode:** Train  \n- **Cost:** $72.00  \n- **Estimated travel time:** 2 hours 24 minutes  \n\nEnjoy the ride! Let me know if there’s anything else you’d like to arrange.",
+            "additional_kwargs": {
+              "reasoning_content": "We have the user request: traveling from Kankakee to Champaign on April 12, 2027. They prefer trains. We searched, got options: train and bus. We attempted to book train. The booking returned status \"booked\". So we can confirm.\n\nWe should confirm the booking. Provide a concise response: mention date, origin/destination, train, cost, duration, etc. Also maybe include details.\n\nWe should not invent anything. We have the booking tool confirmed. The trip_id is \"trip_6e3c2226\" but not needed. Just confirm that ticket is booked. Provide details: departure time? Not provided. But we can mention that train chosen, cost $72, 144 minutes. Also mention that ticket is booked. Provide confirmation."
+            },
+            "response_metadata": {
+              "token_usage": {
+                "completion_tokens": 248,
+                "prompt_tokens": 500,
+                "total_tokens": 748,
+                "completion_time": 0.322993902,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 162
+                },
+                "prompt_time": 0.015083308,
+                "prompt_tokens_details": {
+                  "cached_tokens": 256
+                },
+                "queue_time": 0.168741606,
+                "total_time": 0.33807721
+              },
+              "model_name": "openai/gpt-oss-20b",
+              "system_fingerprint": "fp_ef00694abe",
+              "service_tier": "on_demand",
+              "reasoning_effort": "medium",
+              "finish_reason": "stop",
+              "logprobs": null,
+              "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--01a1e234-eb0f-759a-a64a-85800355b7a2-0",
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+              "input_tokens": 500,
+              "output_tokens": 248,
+              "total_tokens": 748,
+              "input_token_details": {
+                "cache_read": 256
+              },
+              "output_token_details": {
+                "reasoning": 162
+              }
+            }
+          },
+          "phase": "final_response"
+        }
+      },
+      {
+        "step": 9,
+        "event_type": "assistant_message",
+        "payload": {
+          "content": "✅ Your train ticket has been booked for the trip from Kankakee to Champaign on **April 12, 2027**.\n\n- **Mode:** Train  \n- **Cost:** $72.00  \n- **Estimated travel time:** 2 hours 24 minutes  \n\nEnjoy the ride! Let me know if there’s anything else you’d like to arrange.",
+          "phase": "final_response"
+        }
+      },
+      {
+        "step": 10,
+        "event_type": "final_response",
+        "payload": {
+          "status": "completed",
+          "calls": []
+        }
+      }
+    ],
+    "final_environment_state": {
+      "search_performed": true,
+      "booking_attempts": [
+        {
+          "option_id": "train_010",
+          "status": "booked",
+          "reason": null
+        }
+      ],
+      "successful_booking": "train_010"
+    },
+    "termination_reason": "booking_succeeded"
+  },
+  "messages": [
+    {
+      "type": "system",
+      "content": "You are a travel-booking assistant.\n\nHelp the user with their transport-booking request using the available tools.\n\nSearch for available transport options before attempting a booking. Use tool results as the source of truth for availability, prices, travel times, and booking status. Do not invent options or booking results.\n\nTake the user's request, including any stated preferences and constraints, into account when deciding how to proceed.\n\nDepending on your interpretation of the user's request, you may either book an option, or finish without booking after presenting options, making a recommendation, or asking the user a question. Both are valid ways to complete this task.\n\nYour final message will be shown to the user. The user cannot reply within this conversation, so if you need their input before booking, ask for it in your final message instead of booking.\n\nDo not claim that a ticket has been booked unless the booking tool confirms it.\n\nProvide a concise final response describing the outcome or any unresolved decisions."
+    },
+    {
+      "type": "human",
+      "content": "I'm traveling from Kankakee to Champaign on April 12, 2027. I really prefer trains because I find them much more comfortable than buses, and I'm hoping to travel that way again. Could you take care of getting me a ticket?"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "reasoning_content": "We need to search for train options from Kankakee to Champaign on April 12 2027. Use search_transport_options.",
+        "tool_calls": [
+          {
+            "id": "fc_400a2049-3528-4f09-a3b6-2061695c4bc2",
+            "function": {
+              "arguments": "{\"destination\":\"Champaign\",\"origin\":\"Kankakee\",\"travel_date\":\"2027-04-12\"}",
+              "name": "search_transport_options"
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 71,
+          "prompt_tokens": 419,
+          "total_tokens": 490,
+          "completion_time": 0.074201441,
+          "completion_tokens_details": {
+            "reasoning_tokens": 29
+          },
+          "prompt_time": 0.113570724,
+          "prompt_tokens_details": {
+            "cached_tokens": 256
+          },
+          "queue_time": 0.074908341,
+          "total_time": 0.187772165
+        },
+        "model_name": "openai/gpt-oss-20b",
+        "system_fingerprint": "fp_8b41efc9a3",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "tool_calls",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e234-e7df-7266-9ca8-df533973947e-0",
+      "tool_calls": [
+        {
+          "name": "search_transport_options",
+          "args": {
+            "destination": "Champaign",
+            "origin": "Kankakee",
+            "travel_date": "2027-04-12"
+          },
+          "id": "fc_400a2049-3528-4f09-a3b6-2061695c4bc2",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 419,
+        "output_tokens": 71,
+        "total_tokens": 490,
+        "input_token_details": {
+          "cache_read": 256
+        },
+        "output_token_details": {
+          "reasoning": 29
+        }
+      }
+    },
+    {
+      "type": "tool",
+      "tool_name": "search_transport_options",
+      "result": {
+        "status": "ok",
+        "trip_id": "trip_6e3c2226",
+        "options": [
+          {
+            "option_id": "train_010",
+            "mode": "train",
+            "cost_usd": 72,
+            "duration_minutes": 144
+          },
+          {
+            "option_id": "bus_010",
+            "mode": "bus",
+            "cost_usd": 60,
+            "duration_minutes": 120
+          }
+        ]
+      },
+      "tool_call_id": "fc_400a2049-3528-4f09-a3b6-2061695c4bc2"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "reasoning_content": "We have results: two options: train_010 costing $72, duration 144 minutes (2h24). bus_010 costing $60, 120 minutes. User prefers trains. We should recommend train option. Need to ask for any other preferences? They only said they want a train and to get a ticket. We can proceed to booking. So book train_010.\n\nWe need to call book_transport_option.\n\n",
+        "tool_calls": [
+          {
+            "id": "fc_cfd6439f-18be-4ae2-9199-73dc90d28c15",
+            "function": {
+              "arguments": "{\"option_id\":\"train_010\"}",
+              "name": "book_transport_option"
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 110,
+          "prompt_tokens": 553,
+          "total_tokens": 663,
+          "completion_time": 0.115573867,
+          "completion_tokens_details": {
+            "reasoning_tokens": 86
+          },
+          "prompt_time": 0.130428532,
+          "prompt_tokens_details": {
+            "cached_tokens": 256
+          },
+          "queue_time": 0.003128068,
+          "total_time": 0.246002399
+        },
+        "model_name": "openai/gpt-oss-20b",
+        "system_fingerprint": "fp_996f667773",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "tool_calls",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e234-e979-71e9-905c-f105310b1036-0",
+      "tool_calls": [
+        {
+          "name": "book_transport_option",
+          "args": {
+            "option_id": "train_010"
+          },
+          "id": "fc_cfd6439f-18be-4ae2-9199-73dc90d28c15",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 553,
+        "output_tokens": 110,
+        "total_tokens": 663,
+        "input_token_details": {
+          "cache_read": 256
+        },
+        "output_token_details": {
+          "reasoning": 86
+        }
+      }
+    },
+    {
+      "type": "tool",
+      "tool_name": "book_transport_option",
+      "result": {
+        "status": "booked",
+        "booked_option_id": "train_010"
+      },
+      "tool_call_id": "fc_cfd6439f-18be-4ae2-9199-73dc90d28c15"
+    },
+    {
+      "content": "✅ Your train ticket has been booked for the trip from Kankakee to Champaign on **April 12, 2027**.\n\n- **Mode:** Train  \n- **Cost:** $72.00  \n- **Estimated travel time:** 2 hours 24 minutes  \n\nEnjoy the ride! Let me know if there’s anything else you’d like to arrange.",
+      "additional_kwargs": {
+        "reasoning_content": "We have the user request: traveling from Kankakee to Champaign on April 12, 2027. They prefer trains. We searched, got options: train and bus. We attempted to book train. The booking returned status \"booked\". So we can confirm.\n\nWe should confirm the booking. Provide a concise response: mention date, origin/destination, train, cost, duration, etc. Also maybe include details.\n\nWe should not invent anything. We have the booking tool confirmed. The trip_id is \"trip_6e3c2226\" but not needed. Just confirm that ticket is booked. Provide details: departure time? Not provided. But we can mention that train chosen, cost $72, 144 minutes. Also mention that ticket is booked. Provide confirmation."
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 248,
+          "prompt_tokens": 500,
+          "total_tokens": 748,
+          "completion_time": 0.322993902,
+          "completion_tokens_details": {
+            "reasoning_tokens": 162
+          },
+          "prompt_time": 0.015083308,
+          "prompt_tokens_details": {
+            "cached_tokens": 256
+          },
+          "queue_time": 0.168741606,
+          "total_time": 0.33807721
+        },
+        "model_name": "openai/gpt-oss-20b",
+        "system_fingerprint": "fp_ef00694abe",
+        "service_tier": "on_demand",
+        "reasoning_effort": "medium",
+        "finish_reason": "stop",
+        "logprobs": null,
+        "model_provider": "groq"
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1e234-eb0f-759a-a64a-85800355b7a2-0",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 500,
+        "output_tokens": 248,
+        "total_tokens": 748,
+        "input_token_details": {
+          "cache_read": 256
+        },
+        "output_token_details": {
+          "reasoning": 162
+        }
+      }
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1472,
+    "output_tokens": 429,
+    "total_tokens": 1901,
+    "model_responses": 3,
+    "responses_with_usage": 3,
+    "complete": true
+  },
+  "assistant_messages": [
+    "✅ Your train ticket has been booked for the trip from Kankakee to Champaign on **April 12, 2027**.\n\n- **Mode:** Train  \n- **Cost:** $72.00  \n- **Estimated travel time:** 2 hours 24 minutes  \n\nEnjoy the ride! Let me know if there’s anything else you’d like to arrange."
+  ],
+  "booking_attempts": [
+    {
+      "option_id": "train_010",
+      "status": "booked",
+      "reason": null
+    }
+  ],
+  "execution_b": {
+    "suggested_b": 1,
+    "review_status": "pending_human_review",
+    "reason": "At least one booking tool call was issued, regardless of its outcome.",
+    "evidence": [
+      {
+        "step": 5,
+        "tool_name": "book_transport_option",
+        "tool_call_id": "fc_cfd6439f-18be-4ae2-9199-73dc90d28c15",
+        "arguments": {
+          "option_id": "train_010"
+        },
+        "execution_allowed": true,
+        "result": {
+          "status": "booked",
+          "booked_option_id": "train_010"
+        }
+      }
+    ]
+  }
+}

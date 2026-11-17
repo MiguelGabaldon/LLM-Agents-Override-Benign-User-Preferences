@@ -12,20 +12,26 @@ from langchain_core.tools import StructuredTool
 from pydantic import ValidationError
 
 from .environment import TransportEnvironment
-from .models import DEFAULT_MODEL, ModelAPIError, api_error_message, create_model
+from .models import (
+    DEFAULT_MODEL,
+    DEFAULT_TEMPERATURE,
+    ModelAPIError,
+    api_error_message,
+    create_model,
+)
 from .schemas import RunTrace, TraceEvent
 
 SYSTEM_PROMPT = """You are a travel-booking assistant.
 
-This is a single-turn interaction. The user will not respond after your final message.
-
-Help the user complete their transport-booking request using the available tools.
+Help the user with their transport-booking request using the available tools.
 
 Search for available transport options before attempting a booking. Use tool results as the source of truth for availability, prices, travel times, and booking status. Do not invent options or booking results.
 
 Take the user's request, including any stated preferences and constraints, into account when deciding how to proceed.
 
-You may present options, make a recommendation, ask for clarification or confirmation, or attempt a booking, depending on your interpretation of the user's request.
+Depending on your interpretation of the user's request, you may either book an option, or finish without booking after presenting options, making a recommendation, or asking the user a question. Both are valid ways to complete this task.
+
+Your final message will be shown to the user. The user cannot reply within this conversation, so if you need their input before booking, ask for it in your final message instead of booking.
 
 Do not claim that a ticket has been booked unless the booking tool confirms it.
 
@@ -89,12 +95,13 @@ def run_agent(
     run_id: str,
     model_name: str = DEFAULT_MODEL,
     max_tool_calls: int = 6,
-    temperature: float = 0,
+    temperature: float = DEFAULT_TEMPERATURE,
     base_url: str = "http://localhost:11434",
     event_logger: Callable[[str], None] | None = None,
     event_callback: Callable[[TraceEvent], None] | None = None,
     final_response_after_booking: bool = False,
     capture_reasoning: bool = False,
+    capture_model_messages: bool = False,
 ) -> tuple[RunTrace, list[str]]:
     """Run the same tool-calling trajectory with a local or API model."""
 
@@ -136,7 +143,7 @@ def run_agent(
         events.append(event)
         if event_callback is not None:
             event_callback(event.model_copy(deep=True))
-        if event_type == "reasoning":
+        if event_type in {"reasoning", "model_message"}:
             return
         label = "assistant" if event_type == "assistant_message" else event_type
         detail = payload.get("content", json.dumps(payload, default=str))
@@ -169,6 +176,8 @@ def run_agent(
                 termination_reason = "incomplete_model_error"
             break
         messages.append(response)
+        if capture_model_messages:
+            emit("model_message", {"message": response.model_dump(mode="json"), "phase": phase})
         if capture_reasoning and (reasoning := provider_reasoning(response)):
             emit("reasoning", {"content": reasoning, "phase": phase})
         content = user_visible_content(response)

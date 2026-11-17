@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from datetime import UTC, date, datetime
+from datetime import date
 from pathlib import Path
 from random import Random
 
@@ -170,16 +170,21 @@ def option_order_seed(scenario_id: str) -> int:
 def build(out: Path = TASKS_PATH) -> list[Scenario]:
     tasks = build_tasks(load_families(FAMILIES_PATH), load_prompt_templates())
     records = [task.model_dump(mode="json", exclude_none=True) for task in tasks]
-    out.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+    out.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8", newline="\n")
     return tasks
 
 
-def run(model: str, split: str | None, limit: int | None, ids: list[str] | None) -> None:
-    from .agent import run_agent
-    from .environment import TransportEnvironment
+def run(
+    model: str, split: str | None, limit: int | None, ids: list[str] | None, *,
+    trial_id: int = 1, resume: bool = False, output_root: Path | None = None,
+    prompt_ids: list[str] | None = None, delay: float = 0,
+) -> dict[str, int]:
+    from .experiment import run_experiment
     from .scenarios import load_scenarios
 
     tasks = load_scenarios(TASKS_PATH)
+    if limit is not None and limit < 1:
+        raise ValueError("limit must be positive")
     if split:
         tasks = [t for t in tasks if t.dataset_metadata.dataset_split == split]
     if ids:
@@ -187,31 +192,14 @@ def run(model: str, split: str | None, limit: int | None, ids: list[str] | None)
         if unknown:
             raise SystemExit(f"Unknown task IDs (or not in --split): {', '.join(unknown)}")
         tasks = [t for t in tasks if t.scenario_id in ids]
+    if prompt_ids:
+        unknown = set(prompt_ids) - {t.experimental_conditions.template_id for t in tasks}
+        if unknown:
+            raise SystemExit(f"Unknown prompt IDs (or excluded by filters): {sorted(unknown)}")
+        tasks = [t for t in tasks if t.experimental_conditions.template_id in prompt_ids]
     tasks = tasks[:limit] if limit else tasks
-
-    RUNS_DIR.mkdir(exist_ok=True)
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    safe_model = model.replace(":", "-").replace("/", "-")
-    for task in tasks:
-        environment = TransportEnvironment(task, option_order_seed=option_order_seed(task.scenario_id))
-        record = {"scenario": task.model_dump(mode="json", exclude_none=True)}
-        try:
-            # Always ask for a final message after booking: it shows whether the agent
-            # mentions the alternative (behaviour 1 vs 2). Team decision, 2026-11-15.
-            trace, messages = run_agent(
-                environment,
-                f"{stamp}_{task.scenario_id}",
-                model,
-                final_response_after_booking=True,
-            )
-            record |= {"trace": trace.model_dump(mode="json"), "assistant_messages": messages}
-            outcome = f"{trace.termination_reason}, booked={environment.state.successful_booking}"
-        except Exception as error:  # noqa: BLE001 - keep going; the failure is saved
-            record["error"] = f"{type(error).__name__}: {error}"
-            outcome = record["error"]
-        path = RUNS_DIR / f"{stamp}_{task.scenario_id}_{safe_model}.json"
-        path.write_text(json.dumps(record, indent=2, default=str) + "\n", encoding="utf-8")
-        print(f"{task.scenario_id}: {outcome}")
+    return run_experiment(tasks, model, output_root if output_root is not None else RUNS_DIR,
+                          trial_id=trial_id, resume=resume, delay=delay)
 
 
 def main() -> None:
@@ -224,11 +212,20 @@ def main() -> None:
     run_parser.add_argument("--split", choices=["calibration", "validation", "blind_test"])
     run_parser.add_argument("--limit", type=int)
     run_parser.add_argument("--ids", nargs="+", help="specific task IDs, e.g. T03_F01_large")
+    run_parser.add_argument("--prompt-ids", nargs="+", help="template IDs, e.g. T01 T02")
+    run_parser.add_argument("--trial-id", type=int, default=1)
+    run_parser.add_argument("--resume", action="store_true", help="skip completed matching trials")
+    run_parser.add_argument("--output-root", type=Path, default=RUNS_DIR)
+    run_parser.add_argument("--delay", type=float, default=0, metavar="SECONDS",
+                            help="pause between executed cases (rate limits); skipped cases do not wait")
     args = parser.parse_args()
     if args.command == "build":
         print(f"Wrote {len(build())} tasks to {TASKS_PATH}")
     else:
-        run(args.model, args.split, args.limit, args.ids)
+        summary = run(args.model, args.split, args.limit, args.ids, trial_id=args.trial_id,
+                      resume=args.resume, output_root=args.output_root, prompt_ids=args.prompt_ids,
+                      delay=args.delay)
+        print(json.dumps(summary))
 
 
 if __name__ == "__main__":

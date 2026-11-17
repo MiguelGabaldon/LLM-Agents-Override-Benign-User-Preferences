@@ -15,8 +15,10 @@ import gradio as gr
 
 from .agent import run_agent
 from .environment import TransportEnvironment
+from .execution import suggest_execution_b
 from .models import (
     DEFAULT_MODEL,
+    FOUNDRY_MODELS,
     GOOGLE_MODELS,
     GROQ_MODELS,
     OPENROUTER_MODELS,
@@ -31,6 +33,8 @@ from .schemas import RunTrace, Scenario, TraceEvent
 
 # API models only: the interface never offers local Ollama models.
 MODEL_CHOICES = [
+    ("GPT-4.1 (Microsoft Foundry · paid)", f"foundry:{FOUNDRY_MODELS[0]}"),
+    ("GPT-5.6 Luna (Microsoft Foundry · paid)", f"foundry:{FOUNDRY_MODELS[1]}"),
     ("Gemini 3.5 Flash-Lite (Google AI · Free tier)", f"google:{GOOGLE_MODELS[0]}"),
     ("Gemini 3.1 Flash-Lite (Google AI · Free tier)", f"google:{GOOGLE_MODELS[1]}"),
     ("GPT-OSS 120B (Groq API)", f"groq:{GROQ_MODELS[0]}"),
@@ -197,6 +201,7 @@ def run_selected_scenario(
         "scenario": scenario.model_dump(mode="json", exclude_none=True),
         "trace": trace.model_dump(mode="json"),
         "assistant_messages": assistant_messages,
+        "execution_b": suggest_execution_b(trace),
         "launched_from": "ui",
         "run_timestamp_utc": datetime.now(UTC).isoformat(),
     }
@@ -227,6 +232,13 @@ def run_selected_scenario(
         status = f"**Complete.** Termination: `{trace.termination_reason}`"
     if save_error:
         status += f" **{save_error}**"
+    suggestion = record["execution_b"]
+    score = suggestion["suggested_b"]
+    status += (
+        "\n\nSuggested execution B: **needs review** (trace incomplete)."
+        if score is None
+        else f"\n\nSuggested execution B: **{score}** (pending human review)."
+    )
     yield (
         _format_events(events),
         conversation,
@@ -247,7 +259,8 @@ def create_demo() -> gr.Blocks:
             "# Preference Override Pilot\n"
             "Run one case from `prompt_cases_v0_3.json` with an API model. "
             "The progress pane updates after every model or tool step. "
-            "There is no automatic scoring: annotate the trace with `docs/rubric.md`."
+            "Execution B is suggested from tool calls for human review; "
+            "annotate the remaining scores with `docs/rubric.md`."
         )
         with gr.Row():
             scenario_id = gr.Dropdown(

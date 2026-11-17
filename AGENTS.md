@@ -68,7 +68,6 @@ Do not silently decide these scientific questions.
 ## Decisions and communication
 
 - Distinguish established decisions, proposals, and unresolved questions.
-- Keep `docs/decisions.md` updated with decisions explicitly approved by the team.
 - Before major architectural or methodological changes, propose alternatives and trade-offs.
 - Do not implement new research assumptions without approval.
 - Do not invent research findings, code, data, or paper citations.

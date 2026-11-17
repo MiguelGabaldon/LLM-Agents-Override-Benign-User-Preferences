@@ -18,6 +18,7 @@ OPENROUTER_MODELS = (
     "nvidia/nemotron-3.5-lightning:free",
     "cohere/north-mini-code:free",
 )
+FOUNDRY_MODELS = ("gpt-4.1", "gpt-5.6-luna")
 # The Groq SDK appends ``/openai/v1`` to resource paths itself. Supplying that
 # prefix here would produce ``/openai/v1/openai/v1/chat/completions``.
 GROQ_BASE_URL = "https://api.groq.com"
@@ -37,8 +38,17 @@ API_PROVIDERS = {
         "https://openrouter.ai/settings/keys",
         OPENROUTER_MODELS,
     ),
+    "foundry": (
+        "Microsoft Foundry",
+        "FOUNDRY_API_KEY",
+        "https://ai.azure.com/",
+        FOUNDRY_MODELS,
+    ),
 }
 DEFAULT_MODEL = f"google:{GOOGLE_MODELS[0]}"  # API only; never run Ollama by default
+# Shared requested sampling temperature where supported. Gemini 3.5 Flash-Lite
+# fixes it at 1.0, and Foundry GPT-5.6 Luna does not accept temperature.
+DEFAULT_TEMPERATURE = 1.0
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
 
@@ -108,7 +118,7 @@ def provider_api_key(provider: str) -> str:
 
 def create_model(
     selection: str,
-    temperature: float = 0,
+    temperature: float = DEFAULT_TEMPERATURE,
     ollama_base_url: str = "http://localhost:11434",
 ) -> tuple[BaseChatModel, dict[str, Any]]:
     """Return the adapter and a credential-free configuration for the trace."""
@@ -130,6 +140,8 @@ def create_model(
         return _create_google_model(name, key, metadata)
     if provider == "openrouter":
         return _create_openrouter_model(name, key, metadata)
+    if provider == "foundry":
+        return _create_foundry_model(name, key, metadata)
     # Keep local inference usable independently of the optional API adapter.
     from langchain_groq import ChatGroq
 
@@ -230,6 +242,38 @@ def _create_openrouter_model(
         openai_proxy="",
     )
     return adapter, metadata
+
+
+def _create_foundry_model(
+    name: str, key: str, metadata: dict[str, Any]
+) -> tuple[BaseChatModel, dict[str, Any]]:
+    """Use the resource's OpenAI v1 route, with model-specific tool settings."""
+    from langchain_openai import ChatOpenAI
+
+    base_url = (env_value("FOUNDRY_BASE_URL") or "").strip().rstrip("/")
+    if not base_url.startswith("https://") or not base_url.endswith("/openai/v1"):
+        raise ModelConfigurationError(
+            "Set FOUNDRY_BASE_URL to the HTTPS Azure OpenAI v1 base URL "
+            "shown by Foundry (ending in /openai/v1)."
+        )
+    metadata.update(base_url=base_url, timeout=60, max_retries=0)
+    options: dict[str, Any] = {
+        "model": name,
+        "api_key": SecretStr(key),
+        "base_url": base_url,
+        "timeout": 60,
+        "max_retries": 0,
+        "use_responses_api": False,
+    }
+    if name == "gpt-5.6-luna":
+        # Chat Completions can combine GPT-5.6 tools only with no reasoning.
+        # Reasoning models reject temperature and max_tokens.
+        metadata.update(temperature=None, reasoning_effort="none", max_completion_tokens=4096)
+        options.update(reasoning_effort="none", max_completion_tokens=4096)
+    else:
+        metadata["max_tokens"] = 4096
+        options.update(temperature=metadata["temperature"], max_tokens=4096)
+    return ChatOpenAI(**options), metadata
 
 
 def api_error_message(error: Exception, provider: str = "groq") -> str:
