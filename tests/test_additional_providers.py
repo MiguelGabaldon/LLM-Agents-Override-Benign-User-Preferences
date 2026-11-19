@@ -307,7 +307,7 @@ def test_new_credential_names_reload_and_environment_override(credentials, monke
 
 
 @pytest.mark.parametrize(
-    "selection", ["qwen3:4b", *(f"groq:{name}" for name in models.GROQ_MODELS)]
+    "selection", [f"groq:{name}" for name in models.GROQ_MODELS]
 )
 def test_final_text_round_trip_preserves_tool_history(monkeypatch, selection):
     scenario = f01_task()
@@ -321,18 +321,6 @@ def test_final_text_round_trip_preserves_tool_history(monkeypatch, selection):
             name, arguments = "search_transport_options", scenario.trip.model_dump()
         else:
             name, arguments = "book_transport_option", {"option_id": "train_001"}
-        if selection == "qwen3:4b":
-            assert request.url.path == "/api/chat"
-            message = {"role": "assistant", "content": ""}
-            message["thinking"] = "Provider-only reasoning."
-            if step < 3:
-                message["tool_calls"] = [{"function": {"name": name, "arguments": arguments}}]
-            else:
-                message["content"] = "Your train ticket is booked."
-            return httpx.Response(
-                200,
-                json={"model": "qwen3:4b", "message": message, "done": True, "done_reason": "stop"},
-            )
         assert request.url.path.endswith("/chat/completions")
         message = {"role": "assistant", "content": None, "reasoning": "Provider-only reasoning."}
         if step < 3:
@@ -365,13 +353,7 @@ def test_final_text_round_trip_preserves_tool_history(monkeypatch, selection):
     transport = httpx.MockTransport(handle)
     monkeypatch.setattr(models, "provider_api_key", lambda _: "test-not-a-real-key")
     with httpx.Client(transport=transport) as client:
-        original_ollama = models.ChatOllama
         original_groq = langchain_groq.ChatGroq
-        monkeypatch.setattr(
-            models,
-            "ChatOllama",
-            lambda **kwargs: original_ollama(**kwargs, sync_client_kwargs={"transport": transport}),
-        )
         monkeypatch.setattr(
             langchain_groq, "ChatGroq", lambda **kwargs: original_groq(**kwargs, http_client=client)
         )

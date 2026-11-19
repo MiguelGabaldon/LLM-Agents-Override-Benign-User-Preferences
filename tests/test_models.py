@@ -53,23 +53,22 @@ def test_missing_key_has_actionable_error(isolated_credentials, value):
         models.create_model("groq:openai/gpt-oss-120b")
 
 
-def test_local_model_needs_no_credentials_and_retains_settings(isolated_credentials):
-    adapter, metadata = models.create_model("qwen3:4b")
-    assert adapter.model == "qwen3:4b"
-    assert adapter.reasoning is True
-    assert adapter.temperature == models.DEFAULT_TEMPERATURE == 1.0
-    assert adapter.base_url == "http://localhost:11434"
-    assert metadata == {
-        "provider": "ollama",
-        "model_name": "qwen3:4b",
-        "temperature": 1.0,
-        "base_url": "http://localhost:11434",
-    }
-    assert models.resolve_model("custom/model:tag") == ("ollama", "custom/model:tag")
-    assert models.resolve_model("ollama:qwen3:4b") == ("ollama", "qwen3:4b")
+@pytest.mark.parametrize(
+    "selection",
+    [
+        "", "qwen3:4b", "ollama:qwen3:4b", "custom/model:tag",
+        "foundry:gpt-4.1", "foundry:gpt-5.6-luna",
+    ],
+)
+def test_removed_models_are_rejected_before_credentials_or_network(monkeypatch, selection):
+    monkeypatch.setattr(
+        models, "provider_api_key", lambda _: pytest.fail("Unsupported model read credentials")
+    )
+    with pytest.raises(models.ModelConfigurationError, match="supported API model"):
+        models.create_model(selection)
 
 
-def test_unknown_api_model_does_not_fall_back_to_ollama():
+def test_unknown_api_model_does_not_fall_back():
     with pytest.raises(models.ModelConfigurationError, match="supported Groq model"):
         models.resolve_model("groq:unknown")
 

@@ -64,7 +64,7 @@ def fake_models(monkeypatch, interrupt_on=None):
                     usage_metadata={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
                 )
 
-        return Model(), {"provider": "ollama", "model_name": "fake"}
+        return Model(), {"provider": "groq", "model_name": "fake"}
 
     monkeypatch.setattr(agent, "create_model", create)
     return seen
@@ -145,7 +145,7 @@ def test_non_booking_answer_is_completed_and_unknown_usage_is_null(monkeypatch, 
         "create_model",
         lambda *args: (
             Model(),
-            {"provider": "ollama", "model_name": "fake"},
+            {"provider": "groq", "model_name": "fake"},
         ),
     )
     task = load_scenarios(TASKS_PATH)[:1]

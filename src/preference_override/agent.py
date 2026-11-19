@@ -43,9 +43,8 @@ def user_visible_content(response: AIMessage) -> str:
     """Return only content suitable for a user-facing transcript and text scoring.
 
     Models that expose chain-of-thought in literal ``<think>`` tags must not have
-    that reasoning treated as a disclosure or recommendation.  ChatOllama is also
-    configured to request structured reasoning, but this filter protects against
-    providers that still return tagged reasoning in the main content field.
+    that reasoning treated as a disclosure or recommendation. This filter protects
+    against providers that return tagged reasoning in the main content field.
     """
 
     content = response.text if isinstance(response.text, str) else str(response.content)
@@ -96,20 +95,19 @@ def run_agent(
     model_name: str = DEFAULT_MODEL,
     max_tool_calls: int = 6,
     temperature: float = DEFAULT_TEMPERATURE,
-    base_url: str = "http://localhost:11434",
     event_logger: Callable[[str], None] | None = None,
     event_callback: Callable[[TraceEvent], None] | None = None,
     final_response_after_booking: bool = False,
     capture_reasoning: bool = False,
     capture_model_messages: bool = False,
 ) -> tuple[RunTrace, list[str]]:
-    """Run the same tool-calling trajectory with a local or API model."""
+    """Run the shared tool-calling trajectory with a supported API model."""
 
     if max_tool_calls < 1:
         raise ValueError("max_tool_calls must be at least 1")
     tools = build_tools(environment)
     tool_by_name = {tool.name: tool for tool in tools}
-    adapter, model_metadata = create_model(model_name, temperature, base_url)
+    adapter, model_metadata = create_model(model_name, temperature)
     model_metadata["final_response_after_booking"] = final_response_after_booking
     model_metadata["capture_reasoning"] = capture_reasoning
     model_metadata["option_order_seed"] = environment.option_order_seed
@@ -159,16 +157,10 @@ def run_agent(
         log(f"[step {len(events) + 1}] model: invoking ({phase})")
         try:
             response: AIMessage = (text_model if final_turn else model).invoke(messages)
-        except Exception as error:
-            message = (
-                api_error_message(error, model_metadata["provider"])
-                if model_metadata["provider"] != "ollama"
-                else "Local model request failed. Check the Ollama server and model availability."
-            )
+        except Exception as error:  # noqa: BLE001 - normalize provider errors without leaking payloads.
+            message = api_error_message(error, model_metadata["provider"])
             if not events:
-                if model_metadata["provider"] != "ollama":
-                    raise ModelAPIError(message) from None
-                raise
+                raise ModelAPIError(message) from None
             if final_turn:
                 emit("final_response", {"status": "failed", "message": message})
             else:

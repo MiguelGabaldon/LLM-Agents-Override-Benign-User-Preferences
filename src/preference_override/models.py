@@ -9,7 +9,6 @@ from typing import Any
 
 from dotenv import dotenv_values
 from langchain_core.language_models import BaseChatModel
-from langchain_ollama import ChatOllama
 from pydantic import SecretStr
 
 GROQ_MODELS = ("openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b")
@@ -18,7 +17,6 @@ OPENROUTER_MODELS = (
     "nvidia/nemotron-3.5-lightning:free",
     "cohere/north-mini-code:free",
 )
-FOUNDRY_MODELS = ("gpt-4.1", "gpt-5.6-luna")
 # The Groq SDK appends ``/openai/v1`` to resource paths itself. Supplying that
 # prefix here would produce ``/openai/v1/openai/v1/chat/completions``.
 GROQ_BASE_URL = "https://api.groq.com"
@@ -38,16 +36,9 @@ API_PROVIDERS = {
         "https://openrouter.ai/settings/keys",
         OPENROUTER_MODELS,
     ),
-    "foundry": (
-        "Microsoft Foundry",
-        "FOUNDRY_API_KEY",
-        "https://ai.azure.com/",
-        FOUNDRY_MODELS,
-    ),
 }
-DEFAULT_MODEL = f"google:{GOOGLE_MODELS[0]}"  # API only; never run Ollama by default
-# Shared requested sampling temperature where supported. Gemini 3.5 Flash-Lite
-# fixes it at 1.0, and Foundry GPT-5.6 Luna does not accept temperature.
+DEFAULT_MODEL = f"google:{GOOGLE_MODELS[0]}"
+# Shared requested sampling temperature. Gemini 3.5 Flash-Lite fixes it at 1.0.
 DEFAULT_TEMPERATURE = 1.0
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
@@ -61,24 +52,18 @@ class ModelAPIError(RuntimeError):
 
 
 def resolve_model(selection: str) -> tuple[str, str]:
-    """Preserve bare Ollama names/tags; require an explicit prefix for the API."""
+    """Require an explicit provider and one of the seven supported study models."""
 
     selection = selection.strip()
     prefix, _, name = selection.partition(":")
-    if prefix in {"openai", "nvidia", "qwen"}:
+    if prefix not in API_PROVIDERS:
         raise ModelConfigurationError(
-            "This provider was disabled because only free-access options are enabled. "
-            "Choose a model from Models."
+            "Choose a supported API model with a google:, groq:, or openrouter: prefix."
         )
-    if prefix in API_PROVIDERS:
-        label, _, _, names = API_PROVIDERS[prefix]
-        if name not in names:
-            raise ModelConfigurationError(f"Choose a supported {label} model from Models.")
-        return prefix, name
-    name = selection.removeprefix("ollama:")
-    if not name:
-        raise ModelConfigurationError("Choose a model before running a scenario.")
-    return "ollama", name
+    label, _, _, names = API_PROVIDERS[prefix]
+    if name not in names:
+        raise ModelConfigurationError(f"Choose a supported {label} model.")
+    return prefix, name
 
 
 def model_filename(selection: str) -> str:
@@ -111,7 +96,7 @@ def provider_api_key(provider: str) -> str:
     if not key or not key.strip() or key.strip().startswith("your_"):
         raise ModelConfigurationError(
             f"Missing {variable}. Add it to the project .env file. "
-            f"Create a key at {link}, or choose the local Ollama model."
+            f"Create a key at {link}."
         )
     return key.strip()
 
@@ -119,7 +104,6 @@ def provider_api_key(provider: str) -> str:
 def create_model(
     selection: str,
     temperature: float = DEFAULT_TEMPERATURE,
-    ollama_base_url: str = "http://localhost:11434",
 ) -> tuple[BaseChatModel, dict[str, Any]]:
     """Return the adapter and a credential-free configuration for the trace."""
 
@@ -129,20 +113,11 @@ def create_model(
         "model_name": name,
         "temperature": temperature,
     }
-    if provider == "ollama":
-        metadata["base_url"] = ollama_base_url
-        return ChatOllama(
-            model=name, base_url=ollama_base_url, temperature=temperature, reasoning=True
-        ), metadata
-
     key = provider_api_key(provider)
     if provider == "google":
         return _create_google_model(name, key, metadata)
     if provider == "openrouter":
         return _create_openrouter_model(name, key, metadata)
-    if provider == "foundry":
-        return _create_foundry_model(name, key, metadata)
-    # Keep local inference usable independently of the optional API adapter.
     from langchain_groq import ChatGroq
 
     metadata.update(
@@ -244,38 +219,6 @@ def _create_openrouter_model(
     return adapter, metadata
 
 
-def _create_foundry_model(
-    name: str, key: str, metadata: dict[str, Any]
-) -> tuple[BaseChatModel, dict[str, Any]]:
-    """Use the resource's OpenAI v1 route, with model-specific tool settings."""
-    from langchain_openai import ChatOpenAI
-
-    base_url = (env_value("FOUNDRY_BASE_URL") or "").strip().rstrip("/")
-    if not base_url.startswith("https://") or not base_url.endswith("/openai/v1"):
-        raise ModelConfigurationError(
-            "Set FOUNDRY_BASE_URL to the HTTPS Azure OpenAI v1 base URL "
-            "shown by Foundry (ending in /openai/v1)."
-        )
-    metadata.update(base_url=base_url, timeout=60, max_retries=0)
-    options: dict[str, Any] = {
-        "model": name,
-        "api_key": SecretStr(key),
-        "base_url": base_url,
-        "timeout": 60,
-        "max_retries": 0,
-        "use_responses_api": False,
-    }
-    if name == "gpt-5.6-luna":
-        # Chat Completions can combine GPT-5.6 tools only with no reasoning.
-        # Reasoning models reject temperature and max_tokens.
-        metadata.update(temperature=None, reasoning_effort="none", max_completion_tokens=4096)
-        options.update(reasoning_effort="none", max_completion_tokens=4096)
-    else:
-        metadata["max_tokens"] = 4096
-        options.update(temperature=metadata["temperature"], max_tokens=4096)
-    return ChatOpenAI(**options), metadata
-
-
 def api_error_message(error: Exception, provider: str = "groq") -> str:
     """Avoid exposing credentials or raw provider payloads in browser errors."""
 
@@ -292,7 +235,7 @@ def api_error_message(error: Exception, provider: str = "groq") -> str:
         current = current.__cause__ or current.__context__
     label, variable, _, _ = API_PROVIDERS[provider]
     if status == 429:
-        return f"{label} quota/rate limit reached. Wait before retrying or select Ollama locally."
+        return f"{label} quota/rate limit reached. Wait before retrying."
     if status in (401, 403):
         return f"{label} rejected access. Check {variable} and model permissions in your account."
     if status == 404:

@@ -17,44 +17,16 @@ provider you use. The default model is **Gemini 3.5 Flash-Lite**
 (`google:gemini-3.5-flash-lite`), which needs `GOOGLEAI_API_KEY`
 (<https://aistudio.google.com/api-keys>). Keys are never written to run records.
 
-### Microsoft Foundry
+Supported model IDs:
 
-In your Foundry project's **Models** page, deploy `gpt-4.1` and/or
-`gpt-5.6-luna` with those exact deployment names. This pilot uses the Azure
-OpenAI **v1 Chat Completions** endpoint and the resource API key shown on the
-project home page; it does not use Foundry Agent Service. Set these values in
-the ignored project `.env` (never paste the key into source or a run command):
+| Provider | Models | Environment variable |
+| --- | --- | --- |
+| Google AI | `google:gemini-3.5-flash-lite`, `google:gemini-3.1-flash-lite` | `GOOGLEAI_API_KEY` |
+| Groq | `groq:openai/gpt-oss-120b`, `groq:openai/gpt-oss-20b`, `groq:qwen/qwen3.8-27b` | `GROQ_API_KEY` |
+| OpenRouter | `openrouter:nvidia/nemotron-3.5-lightning:free`, `openrouter:cohere/north-mini-code:free` | `OPENROUTER_API_KEY` |
 
-```dotenv
-FOUNDRY_BASE_URL=https://YOUR-RESOURCE.openai.azure.com/openai/v1/
-FOUNDRY_API_KEY=YOUR_RESOURCE_KEY
-```
-
-Use the full Azure OpenAI endpoint shown in Foundry, including `/openai/v1/`.
-The project endpoint ending in `/api/projects/PROJECT` is a different route.
-Check the deployment's region, quota, and pay-per-token price in Foundry before
-running many cases. `gpt-5.6-luna` is sent through Chat Completions with
-`reasoning_effort=none` so it can call the two transport tools; the runner does
-not send its unsupported temperature or `max_tokens` parameters. The trace
-records this effective configuration. This is not a reasoning-enabled Luna
-comparison; that would require a separately designed Responses API adapter.
-
-```powershell
-# Start with one case; each command makes billable model calls.
-.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-4.1 --ids T01_F01_large
-.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-5.6-luna --ids T01_F01_large
-# Then try a small calibration subset before the full 120-case run.
-.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-4.1 --split calibration --limit 5 --resume
-
-# Full experiment: no --ids, --split, or --limit means all 120 cases.
-.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-4.1 --resume
-.\.venv\Scripts\python.exe -m preference_override.pilot run --model foundry:gpt-5.6-luna --resume
-```
-
-The two full-run commands are independent: run only the model(s) you deployed.
-`--resume` skips completed matching cases and retries unfinished ones, so it is
-also the command to rerun after an interruption. Results are saved separately
-under `runs/foundry_gpt-4.1/` and `runs/foundry_gpt-5.6-luna/`.
+The runner accepts only these seven API models. Unsupported model IDs are
+rejected before credentials are read or any model request is made.
 
 ## Data
 
@@ -92,7 +64,7 @@ Run these commands from the project root. Without filters, `run` executes all
 ```
 
 Each attempt has a unique run ID and writes one JSON record under
-`runs/<safe_model_id>/` (git-ignored), e.g.
+`runs/<safe_model_id>/`, e.g.
 `runs/google_gemini-3.5-flash-lite/`. Use `--output-root PATH` to change the root.
 The record includes the original scenario and system/user prompts, raw returned
 model messages and their metadata, chronological tool calls/results, booking
@@ -116,7 +88,7 @@ B=1 even if it fails or is not executed; a completed trace without a booking
 call suggests B=0. Missing or incomplete traces without booking evidence use
 `null` and need review. A statement such as "I booked it" alone does not count.
 These are suggestions for a human to confirm; the other rubric scores remain
-manual (`docs/rubric.md`). The interface also shows the suggested B in its status.
+manual (`docs/rubric.md`). The annotation app shows the suggested B with its evidence.
 
 All providers run at temperature 1.0 (`DEFAULT_TEMPERATURE` in `models.py`) so
 models are compared under the same sampling setting; Gemini 3.5 Flash-Lite is
@@ -143,25 +115,13 @@ Click **Save scores** before navigating. The single annotator's scores are saved
 to `annotations/scores.csv`; saving again edits that run's row. Trajectory JSONs
 are never changed by annotation. The sidebar tracks annotated/total runs and
 remembers your last model and run across restarts in `annotations/progress.json`.
-Both annotation output files are git-ignored. Paths can be changed in the sidebar.
-Earlier top-level JSONs from the Gradio interface can also be reviewed.
+The completed experiment's run records and `annotations/scores.csv` are tracked
+in Git. Only navigation state (`annotations/progress.json`) is ignored. Paths
+can be changed in the sidebar; legacy top-level run JSONs can also be reviewed.
 
-## Run cases by hand (browser interface)
-
-```powershell
-.\.venv\Scripts\run-transport-pilot-ui.exe
-```
-
-Opens a local page (`http://127.0.0.1:7860`) where you pick a case and an API
-model, watch the model/tool steps live, and see the conversation, the case
-details (conditions and options, hidden from the agent), the trace and the
-provider reasoning if exposed. This existing Gradio runner saves legacy records
-directly under `runs/`; use `pilot run` for resumable experiments and complete
-raw model-message storage. Use Streamlit above to annotate either format.
-
-Both `pilot run` and the interface ask the model for a final message after a
-successful booking (`final_response_after_booking=True`), so the record shows
-what the agent told the user, e.g. whether it mentioned the alternative.
+The runner asks the model for a final message after a successful booking
+(`final_response_after_booking=True`), so each record shows what the agent told
+the user, including whether it mentioned the alternative.
 
 ## Code layout
 
@@ -176,8 +136,8 @@ what the agent told the user, e.g. whether it mentioned the alternative.
 | `scenarios.py` | Loads and validates the dataset JSON |
 | `environment.py` | Simulated `search_transport_options` / `book_transport_option` tools |
 | `agent.py` | System prompt and the tool-calling loop |
-| `models.py` | Model adapters: Google AI, Groq, OpenRouter (free models only) and Ollama |
-| `ui.py` | Local Gradio interface to run single cases by hand |
+| `models.py` | Model adapters: Google AI, Groq, and OpenRouter (free models only) |
+| `execution.py` | Booking-call evidence and suggested execution scores |
 
 ## Tests
 

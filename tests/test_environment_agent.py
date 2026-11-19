@@ -166,7 +166,7 @@ def scripted_model(monkeypatch, responses):
 
     model = Model()
     monkeypatch.setattr(
-        agent_module, "create_model", lambda *_: (model, {"provider": "ollama", "model_name": "fake"})  # scripted, no server
+        agent_module, "create_model", lambda *_: (model, {"provider": "groq", "model_name": "fake"})
     )
     return model
 
